@@ -29,6 +29,19 @@ class SQLController:
             
         return result[0] != 0
     
+    def is_group(self, id_val):
+        cur = self.con.cursor()
+
+        if not self.is_id_exists(id_val):
+            raise KeyError('Test or group with id=\'' + 
+                           str(id_val) + 
+                           '\' does not exist')
+
+        result = cur.execute("""SELECT COUNT(*) FROM tests
+            WHERE id = ? AND is_group""", [id_val]).fetchone()
+            
+        return result[0] != 0
+    
     def get_test(self, test_id):
         cur = self.con.cursor()
 
@@ -113,7 +126,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_id_exists(id_val):
-            raise KeyError('Test with id=\'' + str(id_val) + '\' does not exist')
+            raise KeyError('Test or group with id=\'' + 
+                           str(id_val) + 
+                           '\' does not exist')
 
         if len(str(verdict)) != 2:
             raise ValueError('Verdict must be 2 characters long, ' + 
