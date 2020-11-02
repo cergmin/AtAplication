@@ -81,7 +81,7 @@ class SQLController:
 
         self.con.commit()
     
-    def set_console_output(self, console_output, verdict):
+    def set_console_output(self, id_val, console_output):
         cur = self.con.cursor()
 
         results = cur.execute("""SELECT COUNT(*) FROM tests
