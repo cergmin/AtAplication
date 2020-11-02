@@ -60,9 +60,9 @@ QPushButton:hover{
 
 #tests_list,
 #sub_tests_list,
-#sub_test_list__layout,
+#sub_test_list__widget,
 #tests_list__scroll_area,
-#tests_list__scroll_area__layout{
+#tests_list__widget{
 	background: hsl(220, 5%, 12%);
 	border: none;
 }
