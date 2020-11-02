@@ -56,7 +56,7 @@ class SQLController:
                  input_val='', output_val='', parent=-1):
         cur = self.con.cursor()
         
-        if not self.is_id_exists(parent, is_group=True):
+        if parent != -1 and not self.is_id_exists(parent, is_group=True):
             raise KeyError('Group with id=\'' + str(parent) + '\' does not exist')
 
         cur.execute("""INSERT 
@@ -87,11 +87,11 @@ class SQLController:
     # ML - Memory Limit
     # RE - Runtime Error
     # CE - Compilation Error
+    # FL - Fall
     # NP - Ne provereno :)
     def update_group_verdict(self, group_id):
         cur = self.con.cursor()
         verdict_priority = ['FL', 'CE', 'RE', 'WA', 'PE', 'TL', 'ML', 'NP', 'OK']
-
         if not self.is_id_exists(group_id, is_group=True):
             raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
 
