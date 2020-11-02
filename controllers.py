@@ -112,7 +112,7 @@ class SQLController:
     def set_verdict(self, id_val, verdict):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(id_val, is_group=False):
+        if not self.is_id_exists(id_val):
             raise KeyError('Test with id=\'' + str(id_val) + '\' does not exist')
 
         if len(str(verdict)) != 2:
