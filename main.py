@@ -14,20 +14,15 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.selected_test_id = -1
         self.test_buttons = dict()
 
-        # sql.set_verdict(sql.add_test(), 'OK')
-        # sql.set_verdict(sql.add_test(), 'TL')
-        # sql.set_verdict(sql.add_test(), 'ML')
-        # sql.set_verdict(sql.add_test(), 'PE')
-        # sql.set_verdict(sql.add_test(), 'RE')
-        # sql.set_verdict(sql.add_test(), 'CE')
-        # sql.set_verdict(sql.add_test(), 'NP')
-        # sql.set_verdict(sql.add_test(), 'FL')
-
+        self.draw_test_buttons()
         self.draw_test_buttons()
     
     def draw_test_buttons(self):
         tests = self.sql.get_tests()
         self.test_buttons.clear()
+
+        for btn in self.tests_list__widget.findChildren(QtWidgets.QPushButton):
+            btn.deleteLater()
 
         for test in tests:
             test_id = test[0]
@@ -36,7 +31,7 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             if self.selected_test_id == -1:
                 self.selected_test_id = test_id
 
-            test_btn = QtWidgets.QPushButton(self.tests_list__scroll_area__layout)
+            test_btn = QtWidgets.QPushButton(self.tests_list__widget)
             test_btn.setMinimumSize(QtCore.QSize(150, 25))
             test_btn.setMaximumSize(QtCore.QSize(150, 25))
             test_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
@@ -50,9 +45,11 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             if self.selected_test_id == test_id:
                 test_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
 
-            self.verticalLayout_3.addWidget(test_btn)
+            self.tests_list__layout.addWidget(test_btn)
 
             self.test_buttons[test_id] = test_btn
+        
+        self.select_test(self.selected_test_id)
     
     def select_test(self, id_val):
         self.test_buttons[self.selected_test_id].setStyleSheet('')
@@ -61,6 +58,27 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             'border: 2px solid #bbb;border-radius: 5px;'
         )
 
+        if sql.is_group(id_val):
+            self.sub_tests_list.show()
+
+            for btn in \
+                self.sub_test_list__widget.findChildren(QtWidgets.QPushButton):
+                btn.deleteLater()
+
+            for subtest in self.sql.get_subtests(id_val):
+                # subtest_id = subtest[0]
+                verdict = subtest[10]
+
+                subtest_btn = QtWidgets.QPushButton(self.tests_list__widget)
+                subtest_btn.setMinimumSize(QtCore.QSize(150, 25))
+                subtest_btn.setMaximumSize(QtCore.QSize(150, 25))
+                subtest_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+                subtest_btn.setObjectName('test_' + verdict.lower() + '_btn')
+                subtest_btn.setText(verdict)
+
+                self.sub_test_list__layout.addWidget(subtest_btn)
+        else:
+            self.sub_tests_list.hide()
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')
