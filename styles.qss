@@ -1,61 +1,61 @@
 QMainWindow{
-    background: #131415;
+	background: #131415;
 }
 
 QLabel{
-    color: #fff;
-    font-size: 14px;
+	color: #fff;
+	font-size: 14px;
 }
 
 QPushButton{
-    color: #fff;
-    background: hsla(0, 0%, 100%, 0.1);
-    width: 170px;
-    height: 25px;
-    border: none;
-    border-radius: 4px;
+	color: #fff;
+	background: hsla(0, 0%, 100%, 0.1);
+	width: 170px;
+	height: 25px;
+	border: none;
+	border-radius: 4px;
 }
 
 QPushButton:hover{
-    background: hsla(0, 0%, 100%, 0.2);
+	background: hsla(0, 0%, 100%, 0.2);
 }
 
 #main_area{
-    background: #131415;
+	background: #131415;
 }
 
 #test_title{
-    font-size: 20px;
-    font-weight: bold;
+	font-size: 20px;
+	font-weight: bold;
 }
 
 #test_subtitle{
-    color: #aaa;
-    font-size: 14px;
+	color: #aaa;
+	font-size: 13px;
 }
 
 #test_console_title{
-    color: #fff;
-    background: hsl(240, 5%, 5%);
-    padding: 5px 10px;
-    border-bottom: 2px solid #000;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-    font-size: 16px;
-    font-family: 'Consolas';
+	color: #fff;
+	background: hsl(240, 5%, 5%);
+	padding: 5px 10px;
+	border-bottom: 2px solid #000;
+	border-top-left-radius: 5px;
+	border-top-right-radius: 5px;
+	font-size: 16px;
+	font-family: 'Consolas';
 }
 
 #test_console_result{
-    color: #fff;
-    color: hsl(0, 100%, 75%);
-    selection-background-color: #fff;
-    selection-color: #000;
-    background: hsl(240, 5%, 5%);
-    padding: 5px 0px 5px 5px;
-    border-bottom-left-radius: 5px;
-    border-bottom-right-radius: 5px;
-    font-size: 16px;
-    font-family: 'Consolas';
+	color: #fff;
+	color: hsl(0, 100%, 75%);
+	selection-background-color: #fff;
+	selection-color: #000;
+	background: hsl(240, 5%, 5%);
+	padding: 5px 0px 5px 5px;
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	font-size: 16px;
+	font-family: 'Consolas';
 }
 
 #tests_list,
@@ -63,73 +63,92 @@ QPushButton:hover{
 #sub_test_list__layout,
 #tests_list__scroll_area,
 #tests_list__scroll_area__layout{
-    background: hsl(220, 5%, 12%);
-    border: none;
+	background: hsl(220, 5%, 12%);
+	border: none;
 }
 
 #tests_list,
 #sub_tests_list{
-    border-right: 2px solid #111;
+	border-right: 2px solid #111;
 }
 
 #tests_list__scroll_area QScrollBar{
-    width: 0px;
+	width: 0px;
 }
 
 #run_test_btn,
 #run_the_test_btn{
-    background: hsl(240, 100%, 56%);
+	background: hsl(240, 85%, 45%);
 }
 #run_test_btn:hover,
 #run_the_test_btn:hover{
-    background: hsl(240, 100%, 63%);
+	background: hsl(240, 85%, 55%);
 }
 
-#test_re_selected_btn,
 #test_ok_btn,
 #test_pe_btn,
 #test_tl_btn,
 #test_ml_btn,
 #test_wa_btn,
-#test_re_btn{
-    color: #fff;
+#test_re_btn,
+#test_ce_btn,
+#test_fl_btn,
+#test_np_btn{
+	color: #fff;
     font-weight: 600;
+    border-radius: 5px;
 }
 
 #test_ok_btn{
-    background: hsl(130, 60%, 25%);
+    background: hsl(115, 92%, 25%);
+    border: 2px solid hsl(115, 100%, 5%);
 }
 #test_ok_btn:hover{
-    background: hsl(130, 60%, 30%);
+	background: hsl(115, 92%, 30%);
 }
 
 #test_pe_btn,
 #test_tl_btn,
 #test_ml_btn{
-    background: hsl(67, 60%, 25%);
+    background: hsl(70, 100%, 25%);
+    border: 2px solid hsl(70, 100%, 4%);
 }
 #test_pe_btn:hover,
 #test_tl_btn:hover,
 #test_ml_btn:hover{
-    background: hsl(67, 60%, 30%);
+	background: hsl(70, 100%, 30%);
 }
 
-#test_wa_btn{
-    background: hsl(0, 60%, 25%);
+#test_wa_btn,
+#test_fl_btn{
+    background: hsl(0, 92%, 25%);
+    border: 2px solid hsl(0, 100%, 7%);
 }
-#test_wa_btn:hover{
-    background: hsl(0, 60%, 30%);
+#test_wa_btn:hover,
+#test_fl_btn:hover{
+	background: hsl(0, 92%, 30%);
 }
 
 #test_re_btn{
-    background: hsl(300, 60%, 25%);
+    background: hsl(300, 92%, 25%);
+    border: 2px solid hsl(300, 100%, 5%);
 }
 #test_re_btn:hover{
-    background: hsl(300, 60%, 30%);
+	background: hsl(300, 92%, 30%);
 }
 
-#test_re_selected_btn{
-    background: hsl(300, 60%, 30%);
-    border: 2px solid #bbb;
-    border-radius: 5px;
+#test_ce_btn{
+    background: hsl(190, 92%, 25%);
+    border: 2px solid hsl(190, 100%, 4%);
+}
+#test_ce_btn:hover{
+	background: hsl(190, 92%, 30%);
+}
+
+#test_np_btn{
+    background: hsl(0, 0%, 20%);
+    border: 2px solid hsl(0, 0%, 5%);
+}
+#test_np_btn:hover{
+	background: hsl(0, 0%, 25%);
 }
