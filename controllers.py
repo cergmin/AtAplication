@@ -49,7 +49,7 @@ class SQLController:
             raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
 
         return cur.execute("""SELECT * FROM tests 
-            WHERE id = ?""", [test_id]).fetchall()
+            WHERE id = ?""", [test_id]).fetchone()
 
     def get_tests(self):
         cur = self.con.cursor()
