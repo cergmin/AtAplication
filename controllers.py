@@ -17,67 +17,88 @@ class SQLController:
 
         self.file = file
         self.con = sqlite3.connect(self.file)
+        self.con.row_factory = self.dict_factory 
+        # dict_factory позволяет получать словарь, а не список,
+        # когда мы выполгняем cur.execute("...").fetchall(),
+        # где ключами являются названия столбцов таблицы
+
+    def dict_factory(self, cur, row):
+        d = {}
+
+        for id_val, col in enumerate(cur.description):
+            d[col[0]] = row[id_val]
+
+        return d
     
-    def is_id_exists(self, id_val, is_group=None):
+    def is_test_exists(self, test_id):
         cur = self.con.cursor()
-        if is_group is None:
-            result = cur.execute("""SELECT COUNT(*) FROM tests
-                WHERE id = ?""", [id_val]).fetchone()
-        else:
-            result = cur.execute("""SELECT COUNT(*) FROM tests
-                    WHERE id = ? AND is_group = ?""", [id_val, is_group]).fetchone()
-            
-        return result[0] != 0
+        result = cur.execute("""SELECT COUNT(*) FROM tests
+            WHERE id = ?""", [test_id]).fetchone()
+
+        return result['COUNT(*)'] != 0
     
-    def is_group(self, id_val):
+    def is_group_exists(self, group_id):
+        cur = self.con.cursor()
+        result = cur.execute("""SELECT COUNT(*) FROM groups
+            WHERE id = ?""", [group_id]).fetchone()
+            
+        return result['COUNT(*)'] != 0
+    
+    def is_subtest(self, test_id):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(id_val):
-            raise KeyError('Test or group with id=\'' + 
-                           str(id_val) + 
+        if not self.is_test_exists(test_id):
+            raise KeyError('Test with id=\'' + 
+                           str(test_id) + 
                            '\' does not exist')
 
         result = cur.execute("""SELECT COUNT(*) FROM tests
-            WHERE id = ? AND is_group""", [id_val]).fetchone()
+            WHERE id = ? AND group_id != -1""", [test_id]).fetchone()
             
-        return result[0] != 0
+        return result['COUNT(*)'] != 0
+
+    def get_groups(self):
+        cur = self.con.cursor()
+        return cur.execute("""SELECT * FROM groups""").fetchall()
     
     def get_test(self, test_id):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(test_id, is_group=False):
+        if not self.is_test_exists(test_id):
             raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
 
         return cur.execute("""SELECT * FROM tests 
             WHERE id = ?""", [test_id]).fetchone()
 
-    def get_tests(self):
+    def get_tests(self, show_subtests=False):
         cur = self.con.cursor()
-        return cur.execute("""SELECT * FROM tests 
-            WHERE parent = -1""").fetchall()
+
+        if show_subtests:
+            return cur.execute("""SELECT * FROM tests""").fetchall()
+        else:
+            return cur.execute("""SELECT * FROM tests 
+                WHERE group_id = -1""").fetchall()
     
     def get_subtests(self, group_id):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(group_id, is_group=True):
+        if not self.is_group_exists(group_id):
             raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
 
         return cur.execute("""SELECT * FROM tests 
-            WHERE parent = ?""", [group_id]).fetchall()
+            WHERE group_id = ?""", [group_id]).fetchall()
     
-    def add_test(self, title='', subtitle='', input_type=0, output_type=0, 
-                 input_val='', output_val='', parent=-1):
+    def add_test(self, title='', subtitle='', checker=1, checker_arg_1='',
+                 checker_arg_2='', group=-1):
         cur = self.con.cursor()
         
-        if parent != -1 and not self.is_id_exists(parent, is_group=True):
-            raise KeyError('Group with id=\'' + str(parent) + '\' does not exist')
+        if group != -1 and not self.is_group_exists(group):
+            raise KeyError('Group with id=\'' + str(group) + '\' does not exist')
 
         cur.execute("""INSERT 
-            INTO tests(title, subtitle, input_type, output_type, 
-                input, output, parent, is_group) 
-            VALUES(?, ?, ?, ?, ?, ?, ?, false)""", 
-            [title, subtitle, input_type, output_type, 
-            input_val, output_val, parent])
+            INTO tests(group_id, title, subtitle, checker, checker_arg_1, checker_arg_2) 
+            VALUES(?, ?, ?, ?, ?, ?)""", 
+            [group, title, subtitle, checker, checker_arg_1, checker_arg_1])
 
         self.con.commit()
 
@@ -86,9 +107,7 @@ class SQLController:
     def add_group(self):
         cur = self.con.cursor()
 
-        cur.execute("""INSERT 
-            INTO tests(is_group) 
-            VALUES(true)""")
+        cur.execute("""INSERT INTO groups DEFAULT VALUES""")
         self.con.commit()
 
         return cur.lastrowid
@@ -105,11 +124,12 @@ class SQLController:
     def update_group_verdict(self, group_id):
         cur = self.con.cursor()
         verdict_priority = ['FL', 'CE', 'RE', 'WA', 'PE', 'TL', 'ML', 'NP', 'OK']
-        if not self.is_id_exists(group_id, is_group=True):
+
+        if not self.is_group_exists(group_id):
             raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
 
         results = cur.execute("""SELECT verdict FROM tests
-            WHERE parent = ?""", [group_id]).fetchall()
+            WHERE group_id = ?""", [group_id]).fetchall()
         results = set(results)
 
         final_verdict = 'NP'
@@ -118,16 +138,21 @@ class SQLController:
             if tuple([verdict]) in results:
                 final_verdict = verdict
                 break
-        
-        self.set_verdict(group_id, final_verdict)
+
+        cur.execute("""UPDATE groups
+            SET verdict = ?
+            WHERE id = ?""", [final_verdict, group_id])
+
+        self.con.commit()
+
         return final_verdict
 
-    def set_verdict(self, id_val, verdict):
+    def set_verdict(self, test_id, verdict):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(id_val):
-            raise KeyError('Test or group with id=\'' + 
-                           str(id_val) + 
+        if not self.is_test_exists(test_id):
+            raise KeyError('Test with id=\'' + 
+                           str(test_id) + 
                            '\' does not exist')
 
         if len(str(verdict)) != 2:
@@ -136,24 +161,24 @@ class SQLController:
 
         cur.execute("""UPDATE tests
             SET verdict = ?
-            WHERE id = ?""", [verdict, id_val])
+            WHERE id = ?""", [verdict, test_id])
 
         self.con.commit()
 
-        result = cur.execute("""SELECT parent FROM tests
-            WHERE id = ?""", [id_val]).fetchone()
+        result = cur.execute("""SELECT group_id FROM tests
+            WHERE id = ?""", [test_id]).fetchone()
         
         if result[0] != -1:
             self.update_group_verdict(result[0])
     
-    def set_console_output(self, id_val, console_output):
+    def set_console_output(self, test_id, console_output):
         cur = self.con.cursor()
 
-        if not self.is_id_exists(id_val, is_group=False):
-            raise KeyError('Test with id=\'' + str(id_val) + '\' does not exist')
+        if not self.is_test_exists(test_id):
+            raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
 
         cur.execute("""UPDATE tests
             SET console_output = ?
-            WHERE id = ?""", [console_output, id_val])
+            WHERE id = ?""", [console_output, test_id])
 
         self.con.commit()

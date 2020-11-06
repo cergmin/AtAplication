@@ -11,143 +11,90 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
 
         self.sql = sql
-        self.selected_test = [-1, -1] # [id, parent]
+        self.selected_group_id = -1
+        self.selected_test_id = self.sql.get_tests()[0]['id']
         self.test_buttons = dict()
 
-        self.draw_test_buttons()
-        self.draw_test_buttons()
+        self.draw_test_buttons(self.tests_list__widget, 
+                               self.tests_list__layout,
+                               self.sql.get_groups(),
+                               id_prefix='G', # G - group
+                               clear_layout=True,
+                               on_click_function=self.select_group)
+
+        self.draw_test_buttons(self.tests_list__widget, 
+                               self.tests_list__layout,
+                               self.sql.get_tests(),
+                               clear_layout=False,
+                               id_prefix='T', # T - test
+                               on_click_function=self.select_test,
+                               selected_test_id=self.selected_test_id)
     
-    def draw_test_buttons(self):
-        tests = self.sql.get_tests()
-        self.test_buttons.clear()
+    def create_test_btn(self, widget_parent, verdict):
+        test_btn = QtWidgets.QPushButton(widget_parent)
+        test_btn.setMinimumSize(QtCore.QSize(150, 25))
+        test_btn.setMaximumSize(QtCore.QSize(150, 25))
+        test_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        test_btn.setObjectName('test_' + verdict.lower() + '_btn')
+        test_btn.setText(verdict)
 
-        for btn in self.tests_list__widget.findChildren(QtWidgets.QPushButton):
-            btn.deleteLater()
-
-        for test in tests:
-            test_id = test[0]
-            verdict = test[10]
-
-            if self.selected_test == [-1, -1]:
-                if sql.is_group(test_id):
-                    self.selected_test = [test_id, -1]
-                else:
-                    self.selected_test = sql.get_test(test_id)[:2]
-
-            test_btn = QtWidgets.QPushButton(self.tests_list__widget)
-            test_btn.setMinimumSize(QtCore.QSize(150, 25))
-            test_btn.setMaximumSize(QtCore.QSize(150, 25))
-            test_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-            test_btn.setObjectName('test_' + verdict.lower() + '_btn')
-            test_btn.setText(verdict)
-
-            if sql.is_group(test_id):
-                test_btn.clicked.connect(
-                    lambda state, group_id=test_id: 
-                        self.select_group(group_id)
-                )
-            else:
-                test_btn.clicked.connect(
-                    lambda state, id_val=sql.get_test(test_id)[:2]: 
-                        self.select_test(id_val)
-                )
-            
-            if test_id in self.selected_test:
-                test_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
-
-            self.tests_list__layout.addWidget(test_btn)
-
-            self.test_buttons[test_id] = test_btn
-        
-        self.select_test(self.selected_test)
-
-    def draw_subtest_buttons(self, group_id):
-        if not sql.is_group(group_id):
-            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
-        
-        self.sub_tests_list.show()
-
-        all_subbuttons = self.sub_test_list__widget.findChildren(QtWidgets.QPushButton)
-        for btn in all_subbuttons:
-            btn.deleteLater()
-
-        for subtest in self.sql.get_subtests(group_id):
-            subtest_id = subtest[0]
-            verdict = subtest[10]
-
-            subtest_btn = QtWidgets.QPushButton(self.tests_list__widget)
-            subtest_btn.setMinimumSize(QtCore.QSize(150, 25))
-            subtest_btn.setMaximumSize(QtCore.QSize(150, 25))
-            subtest_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-            subtest_btn.setObjectName('test_' + verdict.lower() + '_btn')
-            subtest_btn.setText(verdict)
-
-            subtest_btn.clicked.connect(
-                lambda state, id_val=[subtest_id, group_id]: 
-                    self.select_test(id_val)
-            )
-            
-            if subtest_id in self.selected_test:
-                subtest_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
-
-            self.sub_test_list__layout.addWidget(subtest_btn)
-
-            self.test_buttons[subtest_id] = subtest_btn
+        return test_btn
     
-    def select_test(self, selected_test):
-        if self.selected_test[0] != -1:
-            self.test_buttons[self.selected_test[0]].setStyleSheet('')
-        
-        if self.selected_test[1] != -1:
-            self.test_buttons[self.selected_test[1]].setStyleSheet('')
-            
-        self.selected_test = selected_test
-        self.sub_tests_list.hide()
-
-        if self.selected_test[1] != -1:
-            self.sub_tests_list.show()
-
-            for btn in \
-                self.sub_test_list__widget.findChildren(QtWidgets.QPushButton):
+    def draw_test_buttons(self, widget, layout, tests, clear_layout=False,
+                          on_click_function=None, selected_test_id=-1, id_prefix=''):
+        # удаление всех кнопок из виджета, переданого как аргумент - widget
+        if clear_layout:
+            for btn in widget.findChildren(QtWidgets.QPushButton):
                 btn.deleteLater()
 
-            for subtest in self.sql.get_subtests(self.selected_test[1]):
-                subtest_id = subtest[0]
-                verdict = subtest[10]
+        # вывод всех тестов из аргуемта tests в виде кнопок на экран
+        for test in tests:
+            test_id = test['id']
+            verdict = test['verdict']
 
-                subtest_btn = QtWidgets.QPushButton(self.tests_list__widget)
-                subtest_btn.setMinimumSize(QtCore.QSize(150, 25))
-                subtest_btn.setMaximumSize(QtCore.QSize(150, 25))
-                subtest_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-                subtest_btn.setObjectName('test_' + verdict.lower() + '_btn')
-                subtest_btn.setText(verdict)
-
-                subtest_btn.clicked.connect(
-                    lambda state, id_val=[subtest_id, self.selected_test[1]]: 
-                        self.select_test(id_val)
-                )
-                
-                if subtest_id in self.selected_test:
-                    subtest_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
-
-                self.sub_test_list__layout.addWidget(subtest_btn)
-
-                self.test_buttons[subtest_id] = subtest_btn
-        else:
-            self.sub_tests_list.hide()
-        
-        if selected_test[0] != -1:
-            self.test_buttons[selected_test[0]].setStyleSheet(
-                'border: 2px solid #bbb;border-radius: 5px;'
+            test_btn = self.create_test_btn(widget, verdict)
+            test_btn.clicked.connect(
+                lambda state, test_id=test_id: on_click_function(test_id)
             )
-        
-        if selected_test[1] != -1:
-            self.test_buttons[selected_test[1]].setStyleSheet(
-                'border: 2px solid #bbb;border-radius: 5px;'
-            )
+            layout.addWidget(test_btn)
+            self.test_buttons[str(id_prefix) + str(test['id'])] = test_btn
+            
+            if selected_test_id == test_id:
+                test_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
     
-    def select_group(self, selected_group):
-        self.select_test([sql.get_subtests(selected_group)[0][0], selected_group])
+    def select_test(self, test_id, remove_group_selection=True):
+        if remove_group_selection and self.selected_group_id != -1:
+            self.test_buttons['G' + str(self.selected_group_id)].setStyleSheet('')
+            self.selected_group_id = -1
+
+        if self.selected_test_id != -1:
+            self.test_buttons['T' + str(self.selected_test_id)].setStyleSheet('')
+
+        self.test_buttons['T' + str(test_id)].setStyleSheet(
+            'border: 2px solid #bbb;border-radius: 5px;'
+        )
+        self.selected_test_id = test_id
+
+        if self.sql.get_test(test_id)['group_id'] == -1:
+            self.sub_tests_list.hide()
+        else:
+            self.sub_tests_list.show()
+    
+    def select_group(self, group_id):
+        self.draw_test_buttons(self.sub_test_list__widget, 
+                               self.sub_test_list__layout,
+                               self.sql.get_subtests(group_id),
+                               id_prefix='T', # T - test
+                               clear_layout=True,
+                               on_click_function=lambda x: self.select_test(x, False))
+        
+        self.select_test(sql.get_subtests(group_id)[0]['id'])
+
+        self.test_buttons['G' + str(group_id)].setStyleSheet(
+            'border: 2px solid #bbb;border-radius: 5px;'
+        )
+
+        self.selected_group_id = group_id
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')
