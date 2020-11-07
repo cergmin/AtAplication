@@ -1,9 +1,10 @@
 import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from gui.main_window import Ui_MainWindow
 from controllers import SQLController
+from utilities import *
 
 class AtMainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, sql):
@@ -14,6 +15,14 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.selected_group_id = -1
         self.selected_test_id = self.sql.get_tests()[0]['id']
         self.test_buttons = dict()
+
+        self.main_edit_area.hide()
+        self.edit_test_btn.clicked.connect(self.edit_test)
+        self.save_test_btn.clicked.connect(lambda: self.finish_edit_test(True))
+        self.cancel_edit_btn.clicked.connect(self.finish_edit_test)
+        self.open_file_path_btn.clicked.connect(
+            lambda: self.edit_file_path.setText(self.get_file_path())
+        )
 
         self.draw_test_buttons(self.tests_list__widget, 
                                self.tests_list__layout,
@@ -79,6 +88,46 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             self.sub_tests_list.hide()
         else:
             self.sub_tests_list.show()
+        
+        test_info = self.sql.get_test(test_id)
+        verdict_info = get_verdict_info[test_info['verdict']]
+        checker_info = self.sql.get_checker(test_id)
+
+        # В шаблоны arg_1_title и arg_2_title подставляются
+        # значения из базы данных. Например:
+        # {arg_1} заменяется на значение из базы
+        # из столбца tests.checker_arg_1
+        for dict_key in ['arg_1_title', 'arg_2_title']:
+            for replace_key in ['arg_1', 'arg_2']:
+                checker_info[dict_key] = checker_info[dict_key].replace(
+                    '{' + replace_key + '}',
+                    cut(str(checker_info['checker_' + replace_key]), 13)
+                )
+
+        self.test_title.setText(test_info['title'])
+        self.test_subtitle.setText(test_info['subtitle'])
+        self.test_verdict.setText('''<p>
+            <span style="color:#aaa;">Вердикт: </span>
+            <span style="font-family:'Consolas';
+                        font-weight:600; 
+                        background-color:''' + verdict_info[1] + ''';">''' + 
+            verdict_info[0] + '''</span></p>''')
+        self.test_checker.setText('''<p>
+            <span style="color:#aaa;">Чекер: </span>
+            <span style="font-family:'Consolas';
+                        font-weight:600; 
+                        color:#fff;">''' + 
+            checker_info['name'] + '''</span></p>''')
+        self.test_checker_arg_1.setText(checker_info['arg_1_title'])
+        self.test_checker_arg_2.setText(checker_info['arg_2_title'])
+        self.test_file_path.setText('''<p>
+            <span style="color:#aaa;">Файл: </span>
+            <span style="font-family:'Consolas';
+                         font-weight:600;
+                         color:#fff;">''' +
+            cut_path(test_info['path'], 18) +
+            '''</span></p>''')
+        self.test_console_result.setPlainText(str(test_info['console_output']))
     
     def select_group(self, group_id):
         self.draw_test_buttons(self.sub_test_list__widget, 
@@ -95,6 +144,51 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.selected_group_id = group_id
+    
+    def edit_test(self):
+        self.main_area.hide()
+        self.main_edit_area.show()
+
+        test_info = self.sql.get_test(self.selected_test_id)
+        
+        self.test_title_edit.setText(test_info['title'])
+        self.test_subtitle_edit.setPlainText(test_info['subtitle'])
+        self.edit_checker_arg_1.setPlainText(test_info['checker_arg_1'])
+        self.edit_checker_arg_2.setPlainText(test_info['checker_arg_2'])
+        self.edit_file_path.setText(test_info['path'])
+
+        current_checker_combo_item = self.sql.get_checker(self.selected_test_id)
+        self.edit_checker_combo.clear()
+        for i, item in enumerate(self.sql.get_checkers()):
+            self.edit_checker_combo.addItem(item['name'], userData=item['id'])
+
+            if current_checker_combo_item['id'] == item['id']:
+                self.edit_checker_combo.setCurrentIndex(i)
+    
+    def finish_edit_test(self, save_test=False):
+        self.main_edit_area.hide()
+        self.main_area.show()
+
+        if save_test:
+            self.sql.set_test_info(
+                self.selected_test_id,
+                title=self.test_title_edit.text(),
+                subtitle=self.test_subtitle_edit.toPlainText(),
+                checker=self.edit_checker_combo.currentData(),
+                checker_arg_1=self.edit_checker_arg_1.toPlainText(),
+                checker_arg_2=self.edit_checker_arg_1.toPlainText(),
+                path=self.edit_file_path.text()
+            )
+            
+            self.select_test(self.selected_test_id)
+    
+    def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
+        return QFileDialog.getOpenFileName(
+            self, 
+            title, 
+            '',
+            types
+        )[0]
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')

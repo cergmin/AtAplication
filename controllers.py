@@ -88,6 +88,18 @@ class SQLController:
         return cur.execute("""SELECT * FROM tests 
             WHERE group_id = ?""", [group_id]).fetchall()
     
+    def get_checker(self, test_id):
+        cur = self.con.cursor()
+
+        return cur.execute("""SELECT ch.id, ch.name, ch.arg_1_title, ch.arg_2_title,
+            ch.arg_1_description, ch.arg_2_description, ts.checker_arg_1, ts.checker_arg_2 
+            FROM checkers ch, tests ts
+            WHERE ts.id = ? AND ch.id = ts.checker""", [test_id]).fetchone()
+    
+    def get_checkers(self):
+        cur = self.con.cursor()
+        return cur.execute("""SELECT * FROM checkers""").fetchall()
+    
     def add_test(self, title='', subtitle='', checker=1, checker_arg_1='',
                  checker_arg_2='', group=-1):
         cur = self.con.cursor()
@@ -181,4 +193,25 @@ class SQLController:
             SET console_output = ?
             WHERE id = ?""", [console_output, test_id])
 
+        self.con.commit()
+    
+    def set_test_info(self, test_id, title=None, subtitle=None, path=None,
+                      checker=None, checker_arg_1=None, checker_arg_2=None):
+        cur = self.con.cursor()
+
+        values = {
+            'title': title,
+            'subtitle': subtitle,
+            'path': path,
+            'checker': checker,
+            'checker_arg_1': checker_arg_1,
+            'checker_arg_2': checker_arg_2
+        }
+
+        for key in values:
+            if values[key] is not None:
+                cur.execute("""UPDATE tests
+                    SET """ + key + """ = ?
+                    WHERE id = ?""", [values[key], test_id])
+        
         self.con.commit()
