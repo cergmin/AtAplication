@@ -3,15 +3,16 @@ import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from gui.main_window import Ui_MainWindow
-from controllers import SQLController
+from controllers import *
 from utilities import *
 
 class AtMainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self, sql):
+    def __init__(self, sql, tc):
         super().__init__()
         self.setupUi(self)
 
         self.sql = sql
+        self.tc = tc
         self.selected_group_id = -1
         self.selected_test_id = self.sql.get_tests()[0]['id']
         self.test_buttons = dict()
@@ -22,6 +23,9 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.cancel_edit_btn.clicked.connect(self.finish_edit_test)
         self.open_file_path_btn.clicked.connect(
             lambda: self.edit_file_path.setText(self.get_file_path())
+        )
+        self.run_the_test_btn.clicked.connect(
+            lambda: self.run_test(self.selected_test_id)
         )
 
         self.draw_test_buttons(self.tests_list__widget, 
@@ -151,11 +155,11 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         test_info = self.sql.get_test(self.selected_test_id)
         
-        self.test_title_edit.setText(test_info['title'])
-        self.test_subtitle_edit.setPlainText(test_info['subtitle'])
-        self.edit_checker_arg_1.setPlainText(test_info['checker_arg_1'])
-        self.edit_checker_arg_2.setPlainText(test_info['checker_arg_2'])
-        self.edit_file_path.setText(test_info['path'])
+        self.test_title_edit.setText(str(test_info['title']))
+        self.test_subtitle_edit.setPlainText(str(test_info['subtitle']))
+        self.edit_checker_arg_1.setPlainText(str(test_info['checker_arg_1']))
+        self.edit_checker_arg_2.setPlainText(str(test_info['checker_arg_2']))
+        self.edit_file_path.setText(str(test_info['path']))
 
         current_checker_combo_item = self.sql.get_checker(self.selected_test_id)
         self.edit_checker_combo.clear()
@@ -176,11 +180,14 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 subtitle=self.test_subtitle_edit.toPlainText(),
                 checker=self.edit_checker_combo.currentData(),
                 checker_arg_1=self.edit_checker_arg_1.toPlainText(),
-                checker_arg_2=self.edit_checker_arg_1.toPlainText(),
+                checker_arg_2=self.edit_checker_arg_2.toPlainText(),
                 path=self.edit_file_path.text()
             )
             
             self.select_test(self.selected_test_id)
+    
+    def run_test(self, test_id):
+        self.tc.run_test(test_id)
     
     def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
         return QFileDialog.getOpenFileName(
@@ -192,8 +199,9 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')
+    tc = TestConroller(sql)
     
     app = QApplication(sys.argv)
-    ex = AtMainWindow(sql)
+    ex = AtMainWindow(sql, tc)
     ex.show()
     sys.exit(app.exec_())

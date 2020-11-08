@@ -1,5 +1,88 @@
 import sqlite3
-from os.path import exists, isfile
+import shutil
+import subprocess
+import sys
+import json
+from os.path import exists, isfile, join, abspath, dirname, basename
+from os import mkdir
+from utilities import get_verdict_info
+
+
+class TestConroller:
+    def __init__(self, sql_contoroller):
+        self.queue = []
+        self.sql = sql_contoroller
+    
+    def run_test(self, test_id):
+        self.sql.set_verdict(test_id, 'NP')
+        self.sql.set_console_output(test_id, '')
+
+        test_info = self.sql.get_test(test_id)
+        file_for_test = test_info['path']
+
+        if not exists(file_for_test):
+            raise FileExistsError('File \'' + file_for_test + '\' does not exist')
+        
+        tmp_path = join(
+            abspath(dirname(__file__)), 
+            'tmp'
+        )
+        checkers_folder = join(
+            abspath(dirname(__file__)), 
+            'checkers'
+        )
+
+        if exists(tmp_path):
+            shutil.rmtree(tmp_path)
+        mkdir(tmp_path)
+
+        shutil.copy(file_for_test, tmp_path)
+        shutil.copy(
+            join(checkers_folder, 'checker_' + str(test_info['checker']) + '.py'), 
+            tmp_path
+        )
+
+        file_for_test = join(tmp_path, basename(file_for_test))
+        checker_path = join(
+            tmp_path, 
+            'checker_' + str(test_info['checker']) + '.py'
+        )
+
+        process = subprocess.Popen(
+            [
+                sys.executable, 
+                checker_path, 
+                str(test_info['checker_arg_1']), 
+                str(test_info['checker_arg_2']),
+                file_for_test
+            ], 
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        verdict = 'NP'
+        console_output = ''
+
+        try:
+            out, error = process.communicate()
+
+            output_data = json.loads(out.decode('windows-1251').strip())
+
+            verdict = output_data['verdict']
+            console_output = output_data['console_output']
+
+            if error != b'':
+                raise Exception(error)
+
+            if verdict not in get_verdict_info:
+                raise ValueError('Verdict \'' + verdict + '\' dose not exist')
+        except Exception as E:
+            console_output = E
+            verdict = 'FL'
+        
+        self.sql.set_verdict(test_id, verdict)
+        self.sql.set_console_output(test_id, console_output)
+
 
 class SQLController:
     # Если файла не существует и init_db = True, 
@@ -13,7 +96,7 @@ class SQLController:
             else:
                 raise FileExistsError('File \'' + file + '\' does not exist')
         elif not isfile(file):
-            raise TypeError('File expected')
+            raise TypeError('File expected, but folder were given')
 
         self.file = file
         self.con = sqlite3.connect(self.file)
@@ -180,8 +263,8 @@ class SQLController:
         result = cur.execute("""SELECT group_id FROM tests
             WHERE id = ?""", [test_id]).fetchone()
         
-        if result[0] != -1:
-            self.update_group_verdict(result[0])
+        if result['group_id'] != -1:
+            self.update_group_verdict(result['group_id'])
     
     def set_console_output(self, test_id, console_output):
         cur = self.con.cursor()
