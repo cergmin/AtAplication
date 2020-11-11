@@ -24,10 +24,36 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.open_file_path_btn.clicked.connect(
             lambda: self.edit_file_path.setText(self.get_file_path())
         )
+
+        self.tc.on_verdict_update(self.update_test_results)
+        self.run_test_btn.clicked.connect(
+            lambda: self.run_all_tests()
+        )
         self.run_the_test_btn.clicked.connect(
             lambda: self.run_test(self.selected_test_id)
         )
 
+        self.draw_left_bar()
+    
+    def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
+        return QFileDialog.getOpenFileName(
+            self, 
+            title, 
+            '',
+            types
+        )[0]
+    
+    def create_test_btn(self, widget_parent, verdict):
+        test_btn = QtWidgets.QPushButton(widget_parent)
+        test_btn.setMinimumSize(QtCore.QSize(150, 25))
+        test_btn.setMaximumSize(QtCore.QSize(150, 25))
+        test_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        test_btn.setObjectName('test_' + verdict.lower() + '_btn')
+        test_btn.setText(verdict)
+
+        return test_btn
+    
+    def draw_left_bar(self):
         self.draw_test_buttons(self.tests_list__widget, 
                                self.tests_list__layout,
                                self.sql.get_groups(),
@@ -42,16 +68,7 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                id_prefix='T', # T - test
                                on_click_function=self.select_test,
                                selected_test_id=self.selected_test_id)
-    
-    def create_test_btn(self, widget_parent, verdict):
-        test_btn = QtWidgets.QPushButton(widget_parent)
-        test_btn.setMinimumSize(QtCore.QSize(150, 25))
-        test_btn.setMaximumSize(QtCore.QSize(150, 25))
-        test_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        test_btn.setObjectName('test_' + verdict.lower() + '_btn')
-        test_btn.setText(verdict)
-
-        return test_btn
+        self.select_test(self.selected_test_id)
     
     def draw_test_buttons(self, widget, layout, tests, clear_layout=False,
                           on_click_function=None, selected_test_id=-1, id_prefix=''):
@@ -129,7 +146,7 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             <span style="font-family:'Consolas';
                          font-weight:600;
                          color:#fff;">''' +
-            cut_path(test_info['path'], 18) +
+            cut_path(test_info['path'], 15) +
             '''</span></p>''')
         self.test_console_result.setPlainText(str(test_info['console_output']))
     
@@ -187,15 +204,58 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             self.select_test(self.selected_test_id)
     
     def run_test(self, test_id):
+        self.update_test_results(test_id, 'NP', '')
         self.tc.run_test(test_id)
     
-    def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
-        return QFileDialog.getOpenFileName(
-            self, 
-            title, 
-            '',
-            types
-        )[0]
+    def run_all_tests(self):
+        test_ids = self.sql.get_tests(show_subtests=True)
+        test_ids = map(lambda x: x['id'], test_ids)
+
+        for test_id in test_ids:
+            self.run_test(test_id)
+        
+    def update_group_results(self, group_id, verdict):
+        if ('G' + str(group_id)) in self.test_buttons:
+            group_btn = self.test_buttons['G' + str(group_id)]
+            group_btn.setObjectName('test_' + str(verdict).lower() + '_btn')
+            group_btn.setText(verdict)
+
+            group_btn.setStyleSheet(
+                'border: 2px solid #bbb;border-radius: 5px;'
+                if group_id == self.selected_group_id else 
+                ''
+            )
+    
+    def update_test_results(self, test_id, verdict, console_output):    
+        if test_id == self.selected_test_id:
+            verdict_info = get_verdict_info[verdict]
+            self.test_verdict.setText('''<p>
+                <span style="color:#aaa;">Вердикт: </span>
+                <span style="font-family:'Consolas';
+                            font-weight:600; 
+                            background-color:''' + verdict_info[1] + ''';">''' + 
+                verdict_info[0] + '''</span></p>''')
+            
+            self.test_console_result.setPlainText(console_output)
+        
+        if ('T' + str(test_id)) in self.test_buttons:
+            test_btn = self.test_buttons['T' + str(test_id)]
+            test_btn.setObjectName('test_' + str(verdict).lower() + '_btn')
+            test_btn.setText(verdict)
+            
+            test_btn.setStyleSheet(
+                'border: 2px solid #bbb;border-radius: 5px;'
+                if test_id == self.selected_test_id else 
+                ''
+            )
+            
+        group_id = self.sql.get_test(test_id)['group_id']
+        if group_id != -1:
+            self.sql.update_group_verdict(group_id)
+            self.update_group_results(
+                group_id,
+                self.sql.get_group(group_id)['verdict']
+            )
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')

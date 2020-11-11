@@ -1,2 +1,4 @@
+from time import sleep
+
 a, b = map(int, input().split())
 print(a / b)

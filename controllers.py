@@ -3,16 +3,20 @@ import shutil
 import subprocess
 import sys
 import json
+from PyQt5 import QtCore
 from os.path import exists, isfile, join, abspath, dirname, basename
 from os import mkdir
 from utilities import get_verdict_info
-
+from time import sleep
 
 class TestConroller:
     def __init__(self, sql_contoroller):
-        self.queue = []
         self.sql = sql_contoroller
-    
+        self.on_verdict_update_function = (lambda: None)
+
+    def on_verdict_update(self, func):
+        self.on_verdict_update_function = func
+
     def run_test(self, test_id):
         self.sql.set_verdict(test_id, 'NP')
         self.sql.set_console_output(test_id, '')
@@ -22,48 +26,48 @@ class TestConroller:
 
         if not exists(file_for_test):
             raise FileExistsError('File \'' + file_for_test + '\' does not exist')
-        
-        tmp_path = join(
-            abspath(dirname(__file__)), 
-            'tmp'
-        )
-        checkers_folder = join(
-            abspath(dirname(__file__)), 
-            'checkers'
-        )
-
-        if exists(tmp_path):
-            shutil.rmtree(tmp_path)
-        mkdir(tmp_path)
-
-        shutil.copy(file_for_test, tmp_path)
-        shutil.copy(
-            join(checkers_folder, 'checker_' + str(test_info['checker']) + '.py'), 
-            tmp_path
-        )
-
-        file_for_test = join(tmp_path, basename(file_for_test))
-        checker_path = join(
-            tmp_path, 
-            'checker_' + str(test_info['checker']) + '.py'
-        )
-
-        process = subprocess.Popen(
-            [
-                sys.executable, 
-                checker_path, 
-                str(test_info['checker_arg_1']), 
-                str(test_info['checker_arg_2']),
-                file_for_test
-            ], 
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
 
         verdict = 'NP'
         console_output = ''
 
         try:
+            tmp_path = join(
+                abspath(dirname(__file__)), 
+                'tmp'
+            )
+            checkers_folder = join(
+                abspath(dirname(__file__)), 
+                'checkers'
+            )
+
+            if exists(tmp_path):
+                shutil.rmtree(tmp_path)
+            mkdir(tmp_path)
+
+            shutil.copy(file_for_test, tmp_path)
+            shutil.copy(
+                join(checkers_folder, 'checker_' + str(test_info['checker']) + '.py'), 
+                tmp_path
+            )
+
+            file_for_test = join(tmp_path, basename(file_for_test))
+            checker_path = join(
+                tmp_path, 
+                'checker_' + str(test_info['checker']) + '.py'
+            )
+
+            process = subprocess.Popen(
+                [
+                    sys.executable, 
+                    checker_path, 
+                    str(test_info['checker_arg_1']), 
+                    str(test_info['checker_arg_2']),
+                    file_for_test
+                ], 
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+
             out, error = process.communicate()
 
             output_data = json.loads(out.decode('windows-1251').strip())
@@ -79,9 +83,11 @@ class TestConroller:
         except Exception as E:
             console_output = E
             verdict = 'FL'
-        
+
         self.sql.set_verdict(test_id, verdict)
         self.sql.set_console_output(test_id, console_output)
+    
+        self.on_verdict_update_function(test_id, verdict, console_output)
 
 
 class SQLController:
@@ -99,7 +105,7 @@ class SQLController:
             raise TypeError('File expected, but folder were given')
 
         self.file = file
-        self.con = sqlite3.connect(self.file)
+        self.con = sqlite3.connect(self.file, check_same_thread=False)
         self.con.row_factory = self.dict_factory 
         # dict_factory позволяет получать словарь, а не список,
         # когда мы выполгняем cur.execute("...").fetchall(),
@@ -143,6 +149,15 @@ class SQLController:
     def get_groups(self):
         cur = self.con.cursor()
         return cur.execute("""SELECT * FROM groups""").fetchall()
+    
+    def get_group(self, group_id):
+        cur = self.con.cursor()
+
+        if not self.is_group_exists(group_id):
+            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
+
+        return cur.execute("""SELECT * FROM groups 
+            WHERE id = ?""", [group_id]).fetchone()
     
     def get_test(self, test_id):
         cur = self.con.cursor()
@@ -225,12 +240,13 @@ class SQLController:
 
         results = cur.execute("""SELECT verdict FROM tests
             WHERE group_id = ?""", [group_id]).fetchall()
-        results = set(results)
+        
+        results = set([i['verdict'] for i in results])
 
         final_verdict = 'NP'
 
         for verdict in verdict_priority:
-            if tuple([verdict]) in results:
+            if verdict in results:
                 final_verdict = verdict
                 break
 
@@ -274,7 +290,7 @@ class SQLController:
 
         cur.execute("""UPDATE tests
             SET console_output = ?
-            WHERE id = ?""", [console_output, test_id])
+            WHERE id = ?""", [str(console_output), test_id])
 
         self.con.commit()
     
