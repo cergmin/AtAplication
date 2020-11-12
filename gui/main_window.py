@@ -71,14 +71,6 @@ class Ui_MainWindow(object):
         self.tests_list__scroll_area.setWidget(self.tests_list__widget)
         self.verticalLayout.addWidget(self.tests_list__scroll_area)
 
-        spacerItem1 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        
-        self.verticalLayout.addItem(spacerItem1)
-        self.settings_btn = QtWidgets.QPushButton(self.tests_list)
-        self.settings_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        self.settings_btn.setObjectName("settings_btn")
-        self.verticalLayout.addWidget(self.settings_btn)
-
         self.sub_tests_list = QtWidgets.QScrollArea(self.centralwidget)
         self.sub_tests_list.setMinimumSize(QtCore.QSize(170, 0))
         self.sub_tests_list.setMaximumSize(QtCore.QSize(170, 16777215))
@@ -428,7 +420,6 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "AtAplication"))
         self.run_test_btn.setText(_translate("MainWindow", "Тестировать"))
         self.add_test_btn.setText(_translate("MainWindow", "Добавить"))
-        self.settings_btn.setText(_translate("MainWindow", "Настройки"))
         self.run_the_test_btn.setText(_translate("MainWindow", "Запустить этот тест"))
         self.edit_test_btn.setText(_translate("MainWindow", "Редактировать тест"))
         self.pushButton.setText(_translate("MainWindow", "Сохранить детали"))

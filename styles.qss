@@ -1,10 +1,21 @@
-QMainWindow{
+QMainWindow,
+QDialog{
 	background: #131415;
 }
 
 QLabel{
 	color: #fff;
 	font-size: 14px;
+}
+
+QLineEdit,
+QTextEdit,
+QComboBox,
+QPlainTextEdit{
+	color: #fff;
+	background: hsl(0, 0%, 20%);
+	border: 2px solid hsl(0, 0%, 5%);
+	outline: none;
 }
 
 QPushButton{
@@ -18,6 +29,13 @@ QPushButton{
 
 QPushButton:hover{
 	background: hsla(0, 0%, 100%, 0.2);
+}
+
+#info_label{
+	color: hsl(0, 100%, 75%);
+	margin: 10px 0;
+	font-size: 20px;
+	font-family: 'Consolas';
 }
 
 #main_area{
@@ -72,6 +90,8 @@ QPushButton:hover{
 	border-right: 2px solid #111;
 }
 
+#tests_list QScrollBar,
+#sub_tests_list QScrollBar,
 #tests_list__scroll_area QScrollBar{
 	width: 0px;
 }

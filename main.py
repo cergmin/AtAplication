@@ -1,8 +1,9 @@
 import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QAction
 from gui.main_window import Ui_MainWindow
+from gui.add_test_dialog import AtAddTestDialog
 from controllers import *
 from utilities import *
 
@@ -16,6 +17,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.selected_group_id = -1
         self.selected_test_id = self.sql.get_tests()[0]['id']
         self.test_buttons = dict()
+
+        self.init_menus()
 
         self.main_edit_area.hide()
         self.edit_test_btn.clicked.connect(self.edit_test)
@@ -31,6 +34,12 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         )
         self.run_the_test_btn.clicked.connect(
             lambda: self.run_test(self.selected_test_id)
+        )
+
+        self.add_test_btn.clicked.connect(
+            lambda: self.menu_add.exec_(
+                self.cursor().pos()
+            )
         )
 
         self.draw_left_bar()
@@ -52,6 +61,74 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         test_btn.setText(verdict)
 
         return test_btn
+    
+    def init_menus(self):
+        menu_bar = self.menuBar()
+
+        # Меню -> Файл
+        self.menu_file = menu_bar.addMenu('Файл')
+
+        new_proj_action = QAction('Создать проект', self)
+        # new_proj_action.triggered.connect(
+        #     self.new_project
+        # )
+        self.menu_file.addAction(new_proj_action)
+
+        save_proj_action = QAction('Сохранить проект', self)
+        save_proj_action.setShortcut('Ctrl+S')
+        # save_proj_action.triggered.connect(
+        #     self.save_project
+        # )
+        self.menu_file.addAction(save_proj_action)
+        
+        open_proj_action = QAction('Открыть проект', self)
+        open_proj_action.setShortcut('Ctrl+O')
+        # open_proj_action.triggered.connect(
+        #     self.save_project
+        # )
+        self.menu_file.addAction(open_proj_action)
+
+        quit_action = QAction("Закрыть приложение", self)
+        quit_action.triggered.connect(app.quit)
+        self.menu_file.addAction(quit_action)
+
+        # Меню -> Добавить
+        self.menu_add = menu_bar.addMenu('Добавить')
+
+        create_test_action = QAction('Создать тест', self)
+        create_test_action.triggered.connect(
+            self.create_add_test_dialog
+        )
+        self.menu_add.addAction(create_test_action)
+
+        create_group_action = QAction('Создать группу', self)
+        create_group_action.triggered.connect(
+            self.create_new_group
+        )
+        self.menu_add.addAction(create_group_action)
+
+        # Меню -> Приложение
+        self.menu_settings = menu_bar.addMenu('Приложение')
+
+        open_settings_action = QAction('Настройки', self)
+        open_settings_action.triggered.connect(
+            self.open_settings
+        )
+        self.menu_settings.addAction(open_settings_action)
+
+        open_documentation_action = QAction('Документация', self)
+        open_documentation_action.triggered.connect(
+            self.open_documentation
+        )
+        self.menu_settings.addAction(open_documentation_action)
+
+    def create_add_test_dialog(self):
+        self.add_test_dialog = AtAddTestDialog(self.sql, self)
+        self.add_test_dialog.show()
+    
+    def create_new_group(self):
+        self.sql.add_group()
+        self.draw_left_bar()
     
     def draw_left_bar(self):
         self.draw_test_buttons(self.tests_list__widget, 
@@ -151,6 +228,18 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.test_console_result.setPlainText(str(test_info['console_output']))
     
     def select_group(self, group_id):
+        if len(self.sql.get_subtests(group_id)) == 0:
+            QtWidgets.QMessageBox.critical(
+                self, 
+                "Ошибка", 
+                "В группе #" + 
+                str(group_id) + 
+                " нет тестов для отображения!\n" +
+                "Нажмите \"Добавить\" и создайте тест в этой группе.", 
+                QtWidgets.QMessageBox.Ok
+            )
+            return
+
         self.draw_test_buttons(self.sub_test_list__widget, 
                                self.sub_test_list__layout,
                                self.sql.get_subtests(group_id),
@@ -256,6 +345,12 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 group_id,
                 self.sql.get_group(group_id)['verdict']
             )
+    
+    def open_settings(self):
+        print('Открыть настройки!')
+
+    def open_documentation(self):
+        print('Открыть документацию!')
 
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')

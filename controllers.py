@@ -194,21 +194,29 @@ class SQLController:
             FROM checkers ch, tests ts
             WHERE ts.id = ? AND ch.id = ts.checker""", [test_id]).fetchone()
     
+    def get_checker_by_id(self, checker_id):
+        cur = self.con.cursor()
+        return cur.execute("""SELECT * FROM checkers
+            WHERE id = ?""", [checker_id]).fetchone()
+    
     def get_checkers(self):
         cur = self.con.cursor()
         return cur.execute("""SELECT * FROM checkers""").fetchall()
     
     def add_test(self, title='', subtitle='', checker=1, checker_arg_1='',
-                 checker_arg_2='', group=-1):
+                 checker_arg_2='', group=-1, path=''):
         cur = self.con.cursor()
         
         if group != -1 and not self.is_group_exists(group):
             raise KeyError('Group with id=\'' + str(group) + '\' does not exist')
 
         cur.execute("""INSERT 
-            INTO tests(group_id, title, subtitle, checker, checker_arg_1, checker_arg_2) 
-            VALUES(?, ?, ?, ?, ?, ?)""", 
-            [group, title, subtitle, checker, checker_arg_1, checker_arg_1])
+            INTO tests(group_id, title, subtitle, checker, 
+                       checker_arg_1, checker_arg_2, path) 
+            VALUES(?, ?, ?, ?, ?, ?, ?)""", 
+            [group, title, subtitle, checker, checker_arg_1, 
+             checker_arg_1, path]
+        )
 
         self.con.commit()
 
