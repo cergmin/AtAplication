@@ -6,24 +6,39 @@ from gui.main_window import Ui_MainWindow
 from gui.add_test_dialog import AtAddTestDialog
 from gui.settings_dialog import AtSettingsDialog
 from functools import partial
+from os.path import exists
 from controllers import *
 from utilities import *
 
 class AtMainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self, sql, tc):
+    def __init__(self, sql, tc, pc):
         super().__init__()
         self.setupUi(self)
 
-        self.sql = sql
-        self.tc = tc
+        self.sql = sql  # SQLController
+        self.tc = tc    # TestConroller
+        self.pc = pc    # ProjectController
+
+
         self.selected_group_id = -1
-        self.selected_test_id = self.sql.get_tests()[0]['id']
+        self.selected_test_id = (
+            self.sql.get_tests()[0]['id']
+            if len(self.sql.get_tests()) > 0 else
+            -1
+        )
         self.test_buttons = dict()
 
-        self.set_theme('dark')
+        self.set_theme(self.sql.get_setting('theme'))
+
+        if self.sql.get_setting('last_project') is None or \
+            not exists(self.sql.get_setting('last_project')):
+            self.create_new_project()
+        else:
+            self.pc.load_project(self.sql.get_setting('last_project'))
 
         self.init_menus()
 
+        self.sub_tests_list.hide()
         self.main_edit_area.hide()
         self.edit_test_btn.clicked.connect(self.edit_test)
         self.save_test_btn.clicked.connect(lambda: self.finish_edit_test(True))
@@ -47,6 +62,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.draw_left_bar()
+
+        # print(self.pc.load_project('C:/Users/Катя/Downloads/yandex/project/demo_project/main.atp', safe=False))
     
     def set_theme(self, theme):
         self.theme = theme
@@ -55,6 +72,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 self.setStyleSheet(styles.read())
         
         self.draw_left_bar()
+
+        self.sql.set_setting('theme', theme)
     
     def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
         return QFileDialog.getOpenFileName(
@@ -80,10 +99,10 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         # Меню -> Файл
         self.menu_file = menu_bar.addMenu('Файл')
 
-        new_proj_action = QAction('Создать проект', self)
-        # new_proj_action.triggered.connect(
-        #     self.new_project
-        # )
+        new_proj_action = QAction('Новый проект', self)
+        new_proj_action.triggered.connect(
+            self.create_new_project
+        )
         self.menu_file.addAction(new_proj_action)
 
         save_proj_action = QAction('Сохранить проект', self)
@@ -194,6 +213,33 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.sql.add_group()
         self.draw_left_bar()
     
+    def create_new_project(self):
+        self.pc.new_project()
+
+        self.sub_tests_list.hide()
+        self.main_edit_area.hide()
+        self.main_area.show()
+
+        text_color = ('#fff' if self.theme == 'dark' else '#000')
+        subtext_color = ('#aaa' if self.theme == 'dark' else '#444')
+
+        self.test_title.setText('')
+        self.test_subtitle.setText('')
+        self.test_verdict.setText('')
+        self.test_checker.setText('')
+        self.test_checker_arg_1.setText('')
+        self.test_checker_arg_2.setText('')
+        self.test_file_path.setText('')
+        self.test_console_result.setPlainText('')
+
+        self.run_the_test_btn.hide()
+        self.edit_test_btn.hide()
+        self.pushButton.hide()
+        self.test_console_title.hide()
+        self.test_console_result.hide()
+
+        self.draw_left_bar()
+    
     def draw_left_bar(self):
         self.draw_test_buttons(self.tests_list__widget, 
                                self.tests_list__layout,
@@ -204,6 +250,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                on_context_function=self.group_context_menu)
 
         if not self.sql.is_test_exists(self.selected_test_id):
+            if len(self.sql.get_tests()) == 0:
+                return
             self.selected_test_id = self.sql.get_tests()[0]['id']
 
         self.draw_test_buttons(self.tests_list__widget, 
@@ -250,6 +298,15 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 test_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
     
     def select_test(self, test_id, remove_group_selection=True):
+        if test_id == -1:
+            return
+
+        self.run_the_test_btn.show()
+        self.edit_test_btn.show()
+        self.pushButton.show()
+        self.test_console_title.show()
+        self.test_console_result.show()
+
         if remove_group_selection and self.selected_group_id != -1:
             self.test_buttons['G' + str(self.selected_group_id)].setStyleSheet('')
             self.selected_group_id = -1
@@ -415,11 +472,14 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
     
     def update_test_results(self, test_id, verdict, console_output):    
         if test_id == self.selected_test_id:
+            subtext_color = ('#aaa' if self.theme == 'dark' else '#444')
+
             verdict_info = get_verdict_info[verdict]
             self.test_verdict.setText('''<p>
-                <span style="color:save_s''' + subtext_color + '''ettings_btn;">Вердикт: </span>
+                <span style="color:''' + subtext_color + '''">Вердикт: </span>
                 <span style="font-family:'Consolas';
                             font-weight:600; 
+                            color: #fff;
                             background-color:''' + verdict_info[1] + ''';">''' + 
                 verdict_info[0] + '''</span></p>''')
             
@@ -450,8 +510,9 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')
     tc = TestConroller(sql)
+    pc = ProjectController(sql)
     
     app = QApplication(sys.argv)
-    ex = AtMainWindow(sql, tc)
+    ex = AtMainWindow(sql, tc, pc)
     ex.show()
     sys.exit(app.exec_())

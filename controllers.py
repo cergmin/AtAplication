@@ -9,6 +9,44 @@ from os import mkdir
 from utilities import get_verdict_info
 from time import sleep
 
+
+class ProjectController:
+    def __init__(self, sql_contoroller):
+        self.sql = sql_contoroller
+    
+    def load_project(self, path, safe=True):
+        if not exists(path):
+            if safe:
+                return 'File \'' + path + '\' does not exist'
+            raise FileExistsError('File \'' + path + '\' does not exist')
+
+        if not isfile(path):
+            if safe:
+                return '\'' + path + '\' is not file'
+            raise ValueError('\'' + path + '\' is not file')
+
+        try:
+            project_sql = SQLController(path)
+            if self.sql.get_structure('tests') != \
+                project_sql.get_structure('tests'):
+                raise ValueError('Project has wrong structure')
+                
+            self.sql.paste_table(project_sql, 'tests')
+            self.sql.paste_table(project_sql, 'groups')
+                
+        except Exception as E:
+            if safe:
+                return E
+            raise E
+            
+        return ''
+    
+    def new_project(self):
+        self.sql.clear_table('tests')
+        self.sql.clear_table('groups')
+
+        self.sql.set_setting('last_project', '')
+            
 class TestConroller:
     def __init__(self, sql_contoroller):
         self.sql = sql_contoroller
@@ -119,6 +157,13 @@ class SQLController:
 
         return d
     
+    def is_setting_exists(self, key):
+        cur = self.con.cursor()
+        result = cur.execute("""SELECT COUNT(*) FROM settings
+            WHERE name = ?""", [key]).fetchone()
+
+        return result['COUNT(*)'] != 0
+    
     def is_test_exists(self, test_id):
         cur = self.con.cursor()
         result = cur.execute("""SELECT COUNT(*) FROM tests
@@ -145,6 +190,38 @@ class SQLController:
             WHERE id = ? AND group_id != -1""", [test_id]).fetchone()
             
         return result['COUNT(*)'] != 0
+
+    def get_structure(self, table):
+        cur = self.con.cursor()
+
+        return cur.execute("""PRAGMA table_info(""" + 
+            table + """)""").fetchall()
+
+    def get_setting(self, key):
+        cur = self.con.cursor()
+
+        if not self.is_setting_exists(key):
+            raise KeyError('Setting with key=\'' + 
+                           str(key) + 
+                           '\' does not exist')
+        
+        return cur.execute("""SELECT * FROM settings
+            WHERE name = ?""", [key]).fetchone()['value']
+    
+    def set_setting(self, key, value):
+        cur = self.con.cursor()
+
+        if not self.is_setting_exists(key):
+            raise KeyError('Setting with key=\'' + 
+                           str(key) + 
+                           '\' does not exist')
+        
+        cur.execute("""UPDATE settings
+            SET value = ?
+            WHERE name = ?""", [value, key])
+
+        self.con.commit()
+
 
     def get_groups(self):
         cur = self.con.cursor()
@@ -339,9 +416,35 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_group_exists(group_id):
-            raise KeyError('Group with id=\'' + str(test_id) + '\' does not exist')
+            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
 
         cur.execute("""DELETE FROM groups 
             WHERE id = ?""", [group_id])
+
+        self.con.commit()
+    
+    def clear_table(self, table_name):
+        cur = self.con.cursor()
+        cur.execute("""DELETE FROM """ + table_name)
+    
+    def paste_table(self, other_sql, table_name):
+        if self.get_structure(table_name) != \
+            other_sql.get_structure(table_name):
+                raise ValueError('Tables structures are different')
+
+        cur = self.con.cursor()
+        other_cur = other_sql.con.cursor()
+
+        self.clear_table(table_name)
+
+        all_rows = other_cur.execute("SELECT * FROM " + table_name).fetchall()
+        for row in all_rows:
+            cur.execute("""INSERT INTO """ +
+                table_name +
+                """ VALUES (""" + 
+                ', '.join(['?'] * len(row)) + 
+                """)""", 
+                [row[i] for i in row]
+            )
 
         self.con.commit()
