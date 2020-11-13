@@ -7,9 +7,6 @@ class Ui_MainWindow(object):
         MainWindow.resize(840, 534)
         MainWindow.setMinimumSize(QtCore.QSize(0, 0))
         MainWindow.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        
-        with open('./styles.qss', 'r', encoding='utf-8') as styles:
-                MainWindow.setStyleSheet(styles.read())
 
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setMinimumSize(QtCore.QSize(0, 0))
@@ -259,6 +256,7 @@ class Ui_MainWindow(object):
         self.test_console_title.setObjectName("test_console_title")
         self.test_console.addWidget(self.test_console_title)
         self.test_console_result = QtWidgets.QPlainTextEdit(self.main_area)
+        self.test_console_result.setStyleSheet('border: 2px solid hsl(0, 0%, 5%)')
         self.test_console_result.setEnabled(True)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)

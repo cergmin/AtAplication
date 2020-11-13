@@ -4,6 +4,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QAction
 from gui.main_window import Ui_MainWindow
 from gui.add_test_dialog import AtAddTestDialog
+from gui.settings_dialog import AtSettingsDialog
+from functools import partial
 from controllers import *
 from utilities import *
 
@@ -17,6 +19,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.selected_group_id = -1
         self.selected_test_id = self.sql.get_tests()[0]['id']
         self.test_buttons = dict()
+
+        self.set_theme('dark')
 
         self.init_menus()
 
@@ -37,11 +41,19 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.add_test_btn.clicked.connect(
-            lambda: self.menu_add.exec_(
+            lambda: self.menu_add.exec(
                 self.cursor().pos()
             )
         )
 
+        self.draw_left_bar()
+    
+    def set_theme(self, theme):
+        self.theme = theme
+        
+        with open('./' + self.theme + '_styles.qss', 'r', encoding='utf-8') as styles:
+                self.setStyleSheet(styles.read())
+        
         self.draw_left_bar()
     
     def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
@@ -112,15 +124,67 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         open_settings_action = QAction('Настройки', self)
         open_settings_action.triggered.connect(
-            self.open_settings
+            self.create_settings_dialog
         )
         self.menu_settings.addAction(open_settings_action)
 
-        open_documentation_action = QAction('Документация', self)
+        open_documentation_action = QAction('О приложении', self)
         open_documentation_action.triggered.connect(
             self.open_documentation
         )
         self.menu_settings.addAction(open_documentation_action)
+    
+    def test_context_menu(self, cursor_pos, test_id):
+        menu = QtWidgets.QMenu()
+
+        delete_test_action = QAction('Удалить', self)
+        delete_test_action.triggered.connect(
+            lambda: [
+                    self.sql.delete_test(test_id),
+                    self.draw_left_bar()
+            ]
+        )
+        menu.addAction(delete_test_action)
+
+        menu.exec(cursor_pos)
+    
+    def group_context_menu(self, cursor_pos, group_id):
+        menu = QtWidgets.QMenu()
+
+        delete_group_action = QAction('Подробнее', self)
+        delete_group_action.triggered.connect(
+            lambda: self.group_more_info_dialog(group_id)
+        )
+        menu.addAction(delete_group_action)
+
+        delete_group_action = QAction('Удалить', self)
+        delete_group_action.triggered.connect(
+            lambda: [
+                    self.sql.delete_group(group_id),
+                    self.draw_left_bar()
+            ]
+        )
+        menu.addAction(delete_group_action)
+
+        menu.exec(cursor_pos)
+    
+    def group_more_info_dialog(self, group_id):
+        verdict = get_verdict_info[self.sql.get_group(group_id)['verdict']]
+
+        QtWidgets.QMessageBox.information(
+            self, 
+            "Информация", 
+            "Номер группы: <b>#" + str(group_id) + "</b><br><br>" +
+            "Вердикт группы: " + 
+            "<b style=\"background-color: " + verdict[1] + "\">" +
+            verdict[0] +
+            "</b>", 
+            QtWidgets.QMessageBox.Ok
+        )
+
+    def create_settings_dialog(self):
+        self.settings_dialog = AtSettingsDialog(self.sql, self)
+        self.settings_dialog.show()
 
     def create_add_test_dialog(self):
         self.add_test_dialog = AtAddTestDialog(self.sql, self)
@@ -136,7 +200,11 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                self.sql.get_groups(),
                                id_prefix='G', # G - group
                                clear_layout=True,
-                               on_click_function=self.select_group)
+                               on_click_function=self.select_group,
+                               on_context_function=self.group_context_menu)
+
+        if not self.sql.is_test_exists(self.selected_test_id):
+            self.selected_test_id = self.sql.get_tests()[0]['id']
 
         self.draw_test_buttons(self.tests_list__widget, 
                                self.tests_list__layout,
@@ -144,11 +212,13 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                clear_layout=False,
                                id_prefix='T', # T - test
                                on_click_function=self.select_test,
+                               on_context_function=self.test_context_menu,
                                selected_test_id=self.selected_test_id)
         self.select_test(self.selected_test_id)
     
     def draw_test_buttons(self, widget, layout, tests, clear_layout=False,
-                          on_click_function=None, selected_test_id=-1, id_prefix=''):
+                          on_click_function=None, selected_test_id=-1, id_prefix='',
+                          on_context_function=None):
         # удаление всех кнопок из виджета, переданого как аргумент - widget
         if clear_layout:
             for btn in widget.findChildren(QtWidgets.QPushButton):
@@ -160,9 +230,19 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             verdict = test['verdict']
 
             test_btn = self.create_test_btn(widget, verdict)
-            test_btn.clicked.connect(
-                lambda state, test_id=test_id: on_click_function(test_id)
-            )
+
+            if on_click_function is not None:
+                test_btn.clicked.connect(
+                    lambda state, test_id=test_id: on_click_function(test_id)
+                )
+            
+            if on_context_function is not None:
+                test_btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+                test_btn.customContextMenuRequested.connect(
+                    lambda pos, test_id=test_id: 
+                        on_context_function(self.cursor().pos(), test_id)
+                )
+            
             layout.addWidget(test_btn)
             self.test_buttons[str(id_prefix) + str(test['id'])] = test_btn
             
@@ -195,34 +275,51 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         # значения из базы данных. Например:
         # {arg_1} заменяется на значение из базы
         # из столбца tests.checker_arg_1
-        for dict_key in ['arg_1_title', 'arg_2_title']:
+        for dict_key in ['arg_1_title', 'arg_2_title', 
+                         'arg_1_subtitle', 'arg_2_subtitle']:
             for replace_key in ['arg_1', 'arg_2']:
                 checker_info[dict_key] = checker_info[dict_key].replace(
                     '{' + replace_key + '}',
                     cut(str(checker_info['checker_' + replace_key]), 13)
                 )
 
+        text_color = ('#fff' if self.theme == 'dark' else '#000')
+        subtext_color = ('#aaa' if self.theme == 'dark' else '#444')
+
         self.test_title.setText(test_info['title'])
         self.test_subtitle.setText(test_info['subtitle'])
         self.test_verdict.setText('''<p>
-            <span style="color:#aaa;">Вердикт: </span>
+            <span style="color:''' + subtext_color + ''';">Вердикт: </span>
             <span style="font-family:'Consolas';
-                        font-weight:600; 
+                        font-weight:600;
+                        color: #fff;
                         background-color:''' + verdict_info[1] + ''';">''' + 
             verdict_info[0] + '''</span></p>''')
         self.test_checker.setText('''<p>
-            <span style="color:#aaa;">Чекер: </span>
+            <span style="color:''' + subtext_color + '''">Чекер: </span>
             <span style="font-family:'Consolas';
                         font-weight:600; 
-                        color:#fff;">''' + 
+                        color:''' + text_color + '''">''' + 
             checker_info['name'] + '''</span></p>''')
-        self.test_checker_arg_1.setText(checker_info['arg_1_title'])
-        self.test_checker_arg_2.setText(checker_info['arg_2_title'])
+        self.test_checker_arg_1.setText('''<p>
+            <span style="color:''' + subtext_color + '''">''' + 
+            checker_info['arg_1_title'] + ''': </span>
+            <span style="font-family:'Consolas';
+                        font-weight:600; 
+                        color:''' + text_color + '''">''' + 
+            checker_info['arg_1_subtitle'] + '''</span></p>''')
+        self.test_checker_arg_2.setText('''<p>
+            <span style="color:''' + subtext_color + '''">''' + 
+            checker_info['arg_2_title'] + ''': </span>
+            <span style="font-family:'Consolas';
+                        font-weight:600; 
+                        color:''' + text_color + '''">''' + 
+            checker_info['arg_2_subtitle'] + '''</span></p>''')
         self.test_file_path.setText('''<p>
-            <span style="color:#aaa;">Файл: </span>
+            <span style="color:''' + subtext_color + '''">Файл: </span>
             <span style="font-family:'Consolas';
                          font-weight:600;
-                         color:#fff;">''' +
+                         color:''' + text_color + '''">''' +
             cut_path(test_info['path'], 15) +
             '''</span></p>''')
         self.test_console_result.setPlainText(str(test_info['console_output']))
@@ -245,7 +342,8 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                self.sql.get_subtests(group_id),
                                id_prefix='T', # T - test
                                clear_layout=True,
-                               on_click_function=lambda x: self.select_test(x, False))
+                               on_click_function=lambda x: self.select_test(x, False),
+                               on_context_function=self.test_context_menu)
         
         self.select_test(sql.get_subtests(group_id)[0]['id'])
 
@@ -319,7 +417,7 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         if test_id == self.selected_test_id:
             verdict_info = get_verdict_info[verdict]
             self.test_verdict.setText('''<p>
-                <span style="color:#aaa;">Вердикт: </span>
+                <span style="color:save_s''' + subtext_color + '''ettings_btn;">Вердикт: </span>
                 <span style="font-family:'Consolas';
                             font-weight:600; 
                             background-color:''' + verdict_info[1] + ''';">''' + 
@@ -345,9 +443,6 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 group_id,
                 self.sql.get_group(group_id)['verdict']
             )
-    
-    def open_settings(self):
-        print('Открыть настройки!')
 
     def open_documentation(self):
         print('Открыть документацию!')

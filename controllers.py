@@ -190,7 +190,8 @@ class SQLController:
         cur = self.con.cursor()
 
         return cur.execute("""SELECT ch.id, ch.name, ch.arg_1_title, ch.arg_2_title,
-            ch.arg_1_description, ch.arg_2_description, ts.checker_arg_1, ts.checker_arg_2 
+            ch.arg_1_subtitle, ch.arg_2_subtitle, ch.arg_1_description, 
+            ch.arg_2_description, ts.checker_arg_1, ts.checker_arg_2 
             FROM checkers ch, tests ts
             WHERE ts.id = ? AND ch.id = ts.checker""", [test_id]).fetchone()
     
@@ -321,4 +322,26 @@ class SQLController:
                     SET """ + key + """ = ?
                     WHERE id = ?""", [values[key], test_id])
         
+        self.con.commit()
+    
+    def delete_test(self, test_id):
+        cur = self.con.cursor()
+
+        if not self.is_test_exists(test_id):
+            raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
+
+        cur.execute("""DELETE FROM tests 
+            WHERE id = ?""", [test_id])
+
+        self.con.commit()
+    
+    def delete_group(self, group_id):
+        cur = self.con.cursor()
+
+        if not self.is_group_exists(group_id):
+            raise KeyError('Group with id=\'' + str(test_id) + '\' does not exist')
+
+        cur.execute("""DELETE FROM groups 
+            WHERE id = ?""", [group_id])
+
         self.con.commit()

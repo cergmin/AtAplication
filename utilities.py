@@ -1,3 +1,13 @@
+from PyQt5 import QtCore, QtWidgets
+
+
+class QClickableLabel(QtWidgets.QLabel):
+    clicked = QtCore.pyqtSignal()
+ 
+    def mousePressEvent(self, QMouseEvent):
+        self.clicked.emit()
+
+
 get_verdict_info = {
     # short_name: [full_name, color]
     'OK': ['Тест пройден', 'hsl(115, 92%, 23%)'],
