@@ -5,7 +5,7 @@ import sys
 import json
 from PyQt5 import QtCore
 from os.path import exists, isfile, join, abspath, dirname, basename
-from os import mkdir
+from os import mkdir, remove
 from utilities import get_verdict_info
 from time import sleep
 
@@ -28,17 +28,62 @@ class ProjectController:
         try:
             project_sql = SQLController(path)
             if self.sql.get_structure('tests') != \
-                project_sql.get_structure('tests'):
+               project_sql.get_structure('tests'):
                 raise ValueError('Project has wrong structure')
                 
             self.sql.paste_table(project_sql, 'tests')
             self.sql.paste_table(project_sql, 'groups')
+
+            self.sql.set_setting('last_project', path)
+
+            project_sql.con.close()
                 
         except Exception as E:
             if safe:
-                return E
+                return str(E)
             raise E
             
+        return ''
+    
+    def save_project(self, path, safe=True):
+        try:
+            if exists(path):
+                remove(path)
+
+            # Создаёт файл базы данных
+            sqlite3.connect(path).close()
+
+            new_sql = SQLController(path)
+
+            new_sql.execute("""CREATE TABLE tests (
+                    id             INTEGER     PRIMARY KEY,
+                    group_id       INTEGER     DEFAULT (-1),
+                    title          TEXT,
+                    subtitle       TEXT,
+                    console_output TEXT,
+                    verdict        VARCHAR (2) DEFAULT NP,
+                    path           TEXT,
+                    checker        INTEGER     DEFAULT (1),
+                    checker_arg_1  TEXT,
+                    checker_arg_2  TEXT
+                );""")
+
+            new_sql.execute("""CREATE TABLE groups (
+                    id      INTEGER     PRIMARY KEY,
+                    verdict VARCHAR (2) DEFAULT NP
+                );""")
+            
+            new_sql.paste_table(self.sql, 'tests')
+            new_sql.paste_table(self.sql, 'groups')
+
+            self.sql.set_setting('last_project', path)
+
+            new_sql.con.close()
+        except Exception as E:
+            if safe:
+                return str(E)
+            raise E
+        
         return ''
     
     def new_project(self):
@@ -46,7 +91,8 @@ class ProjectController:
         self.sql.clear_table('groups')
 
         self.sql.set_setting('last_project', '')
-            
+
+
 class TestConroller:
     def __init__(self, sql_contoroller):
         self.sql = sql_contoroller
@@ -63,10 +109,15 @@ class TestConroller:
         file_for_test = test_info['path']
 
         if not exists(file_for_test):
-            raise FileExistsError('File \'' + file_for_test + '\' does not exist')
+            raise FileExistsError(
+                'File \'' + 
+                file_for_test + 
+                '\' does not exist')
 
         verdict = 'NP'
         console_output = ''
+
+        debug_info = ''
 
         try:
             tmp_path = join(
@@ -84,7 +135,12 @@ class TestConroller:
 
             shutil.copy(file_for_test, tmp_path)
             shutil.copy(
-                join(checkers_folder, 'checker_' + str(test_info['checker']) + '.py'), 
+                join(
+                    checkers_folder,
+                    'checker_' + 
+                    str(test_info['checker']) + 
+                    '.py'
+                ), 
                 tmp_path
             )
 
@@ -108,6 +164,12 @@ class TestConroller:
 
             out, error = process.communicate()
 
+            debug_info += '---[ output ]---\n'
+            debug_info += str(out.decode('windows-1251').strip())
+            debug_info += '\n---[ errors ]---\n'
+            debug_info += str(error.decode('windows-1251').strip())
+            debug_info += '\n----------------\n'
+
             output_data = json.loads(out.decode('windows-1251').strip())
 
             verdict = output_data['verdict']
@@ -119,7 +181,7 @@ class TestConroller:
             if verdict not in get_verdict_info:
                 raise ValueError('Verdict \'' + verdict + '\' dose not exist')
         except Exception as E:
-            console_output = E
+            console_output = debug_info + str(type(E).__name__) + ': ' + str(E)
             verdict = 'FL'
 
         self.sql.set_verdict(test_id, verdict)
@@ -156,6 +218,11 @@ class SQLController:
             d[col[0]] = row[id_val]
 
         return d
+
+    def execute(self, query):
+        cur = self.con.cursor()
+        cur.execute(query)
+        self.con.commit()
     
     def is_setting_exists(self, key):
         cur = self.con.cursor()
@@ -195,7 +262,7 @@ class SQLController:
         cur = self.con.cursor()
 
         return cur.execute("""PRAGMA table_info(""" + 
-            table + """)""").fetchall()
+                           table + """)""").fetchall()
 
     def get_setting(self, key):
         cur = self.con.cursor()
@@ -222,7 +289,6 @@ class SQLController:
 
         self.con.commit()
 
-
     def get_groups(self):
         cur = self.con.cursor()
         return cur.execute("""SELECT * FROM groups""").fetchall()
@@ -231,7 +297,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_group_exists(group_id):
-            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
+            raise KeyError('Group with id=\'' + 
+                           str(group_id) + 
+                           '\' does not exist')
 
         return cur.execute("""SELECT * FROM groups 
             WHERE id = ?""", [group_id]).fetchone()
@@ -240,7 +308,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_test_exists(test_id):
-            raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
+            raise KeyError('Test with id=\'' + 
+                           str(test_id) + 
+                           '\' does not exist')
 
         return cur.execute("""SELECT * FROM tests 
             WHERE id = ?""", [test_id]).fetchone()
@@ -258,7 +328,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_group_exists(group_id):
-            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
+            raise KeyError('Group with id=\'' + 
+                           str(group_id) + 
+                           '\' does not exist')
 
         return cur.execute("""SELECT * FROM tests 
             WHERE group_id = ?""", [group_id]).fetchall()
@@ -266,9 +338,10 @@ class SQLController:
     def get_checker(self, test_id):
         cur = self.con.cursor()
 
-        return cur.execute("""SELECT ch.id, ch.name, ch.arg_1_title, ch.arg_2_title,
-            ch.arg_1_subtitle, ch.arg_2_subtitle, ch.arg_1_description, 
-            ch.arg_2_description, ts.checker_arg_1, ts.checker_arg_2 
+        return cur.execute("""SELECT ch.id, ch.name, ch.arg_1_title, 
+            ch.arg_2_title, ch.arg_1_subtitle, ch.arg_2_subtitle, 
+            ch.arg_1_description, ch.arg_2_description, ts.checker_arg_1, 
+            ts.checker_arg_2 
             FROM checkers ch, tests ts
             WHERE ts.id = ? AND ch.id = ts.checker""", [test_id]).fetchone()
     
@@ -286,15 +359,17 @@ class SQLController:
         cur = self.con.cursor()
         
         if group != -1 and not self.is_group_exists(group):
-            raise KeyError('Group with id=\'' + str(group) + '\' does not exist')
+            raise KeyError('Group with id=\'' + 
+                           str(group) + 
+                           '\' does not exist')
 
-        cur.execute("""INSERT 
+        cur.execute(
+            """INSERT 
             INTO tests(group_id, title, subtitle, checker, 
                        checker_arg_1, checker_arg_2, path) 
             VALUES(?, ?, ?, ?, ?, ?, ?)""", 
             [group, title, subtitle, checker, checker_arg_1, 
-             checker_arg_1, path]
-        )
+             checker_arg_2, path])
 
         self.con.commit()
 
@@ -319,10 +394,13 @@ class SQLController:
     # NP - Ne provereno :)
     def update_group_verdict(self, group_id):
         cur = self.con.cursor()
-        verdict_priority = ['FL', 'CE', 'RE', 'WA', 'PE', 'TL', 'ML', 'NP', 'OK']
+        verdict_priority = ['FL', 'CE', 'RE', 'WA', 
+                            'PE', 'TL', 'ML', 'NP', 'OK']
 
         if not self.is_group_exists(group_id):
-            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
+            raise KeyError('Group with id=\'' + 
+                           str(group_id) + 
+                           '\' does not exist')
 
         results = cur.execute("""SELECT verdict FROM tests
             WHERE group_id = ?""", [group_id]).fetchall()
@@ -372,7 +450,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_test_exists(test_id):
-            raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
+            raise KeyError('Test with id=\'' + 
+                           str(test_id) +
+                           '\' does not exist')
 
         cur.execute("""UPDATE tests
             SET console_output = ?
@@ -405,7 +485,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_test_exists(test_id):
-            raise KeyError('Test with id=\'' + str(test_id) + '\' does not exist')
+            raise KeyError('Test with id=\'' + 
+                           str(test_id) + 
+                           '\' does not exist')
 
         cur.execute("""DELETE FROM tests 
             WHERE id = ?""", [test_id])
@@ -416,7 +498,9 @@ class SQLController:
         cur = self.con.cursor()
 
         if not self.is_group_exists(group_id):
-            raise KeyError('Group with id=\'' + str(group_id) + '\' does not exist')
+            raise KeyError('Group with id=\'' + 
+                           str(group_id) + 
+                           '\' does not exist')
 
         cur.execute("""DELETE FROM groups 
             WHERE id = ?""", [group_id])
@@ -429,7 +513,7 @@ class SQLController:
     
     def paste_table(self, other_sql, table_name):
         if self.get_structure(table_name) != \
-            other_sql.get_structure(table_name):
+           other_sql.get_structure(table_name):
                 raise ValueError('Tables structures are different')
 
         cur = self.con.cursor()
@@ -439,12 +523,12 @@ class SQLController:
 
         all_rows = other_cur.execute("SELECT * FROM " + table_name).fetchall()
         for row in all_rows:
-            cur.execute("""INSERT INTO """ +
+            cur.execute(
+                """INSERT INTO """ +
                 table_name +
                 """ VALUES (""" + 
                 ', '.join(['?'] * len(row)) + 
                 """)""", 
-                [row[i] for i in row]
-            )
+                [row[i] for i in row])
 
         self.con.commit()

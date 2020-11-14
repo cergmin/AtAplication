@@ -21,6 +21,7 @@ get_verdict_info = {
     'NP': ['Не проверено', 'hsl(0, 0%, 20%)']
 }
 
+
 def cut(s, max_len, ending='...'):
     s = str(s)
     ending = str(ending)
@@ -28,6 +29,7 @@ def cut(s, max_len, ending='...'):
     if len(s) <= max_len:
         return s
     return s[:max_len - len(ending)] + ending
+
 
 def cut_path(path, max_len, sep='/'):
     path = str(path)

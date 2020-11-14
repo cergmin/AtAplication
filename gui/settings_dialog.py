@@ -20,6 +20,8 @@ class AtSettingsDialog(QtWidgets.QDialog):
 
         self.create_UI()
 
+        theme = self.sql.get_setting('theme')
+
         dark_theme_icon = \
             QtGui.QPixmap('./images/dark_theme_icon.png')
         dark_theme_icon = dark_theme_icon.scaled(
@@ -49,17 +51,30 @@ class AtSettingsDialog(QtWidgets.QDialog):
         )
 
         self.dark_theme_image.setMaximumSize(QtCore.QSize(300, 200))
-        self.dark_theme_image.setPixmap(dark_theme_icon)
 
         self.light_theme_image.setMaximumSize(QtCore.QSize(300, 200))
-        self.light_theme_image.setPixmap(light_theme_icon)
+
+        if theme == 'light':
+            self.dark_theme_image.setPixmap(dark_theme_icon)
+            self.light_theme_image.setPixmap(selected_light_theme_icon)
+        elif theme == 'dark':
+            self.dark_theme_image.setPixmap(selected_dark_theme_icon)
+            self.light_theme_image.setPixmap(light_theme_icon)
 
         self.dark_theme_image.clicked.connect(
-            lambda: parent.set_theme('dark')
+            lambda: [
+                parent.set_theme('dark'),
+                self.dark_theme_image.setPixmap(selected_dark_theme_icon),
+                self.light_theme_image.setPixmap(light_theme_icon)
+            ]
         )
 
         self.light_theme_image.clicked.connect(
-            lambda: parent.set_theme('light')
+            lambda: [
+                parent.set_theme('light'),
+                self.dark_theme_image.setPixmap(dark_theme_icon),
+                self.light_theme_image.setPixmap(selected_light_theme_icon)
+            ]
         )
 
         self.save_settings_btn.clicked.connect(self.close)

@@ -10,6 +10,7 @@ from os.path import exists
 from controllers import *
 from utilities import *
 
+
 class AtMainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, sql, tc, pc):
         super().__init__()
@@ -18,7 +19,6 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.sql = sql  # SQLController
         self.tc = tc    # TestConroller
         self.pc = pc    # ProjectController
-
 
         self.selected_group_id = -1
         self.selected_test_id = (
@@ -31,10 +31,15 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.set_theme(self.sql.get_setting('theme'))
 
         if self.sql.get_setting('last_project') is None or \
-            not exists(self.sql.get_setting('last_project')):
+           not exists(self.sql.get_setting('last_project')):
             self.create_new_project()
         else:
-            self.pc.load_project(self.sql.get_setting('last_project'))
+            result = self.pc.load_project(
+                self.sql.get_setting('last_project')
+            )
+
+            if result != '':
+                self.create_new_project()
 
         self.init_menus()
 
@@ -62,26 +67,33 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.draw_left_bar()
-
-        # print(self.pc.load_project('C:/Users/Катя/Downloads/yandex/project/demo_project/main.atp', safe=False))
     
     def set_theme(self, theme):
         self.theme = theme
         
-        with open('./' + self.theme + '_styles.qss', 'r', encoding='utf-8') as styles:
-                self.setStyleSheet(styles.read())
+        with open(
+                './' + self.theme + '_styles.qss', 
+                'r', 
+                encoding='utf-8'
+        ) as styles:
+            self.setStyleSheet(styles.read())
         
         self.draw_left_bar()
 
         self.sql.set_setting('theme', theme)
     
-    def get_file_path(self, title='Выбор файла', types='Все файлы (*)'):
-        return QFileDialog.getOpenFileName(
-            self, 
-            title, 
-            '',
-            types
-        )[0]
+    def get_file_path(self, 
+                      title='Выбор файла',
+                      file_name='',
+                      types='Все файлы (*)',
+                      dialog_type='open'):
+
+        attrs = [self, title, file_name, types]
+        
+        if dialog_type == 'open':
+            return QFileDialog.getOpenFileName(*attrs)[0] 
+        elif dialog_type == 'save':
+            return QFileDialog.getSaveFileName(*attrs)[0] 
     
     def create_test_btn(self, widget_parent, verdict):
         test_btn = QtWidgets.QPushButton(widget_parent)
@@ -107,16 +119,16 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         save_proj_action = QAction('Сохранить проект', self)
         save_proj_action.setShortcut('Ctrl+S')
-        # save_proj_action.triggered.connect(
-        #     self.save_project
-        # )
+        save_proj_action.triggered.connect(
+            self.save_project
+        )
         self.menu_file.addAction(save_proj_action)
         
         open_proj_action = QAction('Открыть проект', self)
         open_proj_action.setShortcut('Ctrl+O')
-        # open_proj_action.triggered.connect(
-        #     self.save_project
-        # )
+        open_proj_action.triggered.connect(
+            self.open_project
+        )
         self.menu_file.addAction(open_proj_action)
 
         quit_action = QAction("Закрыть приложение", self)
@@ -149,7 +161,7 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         open_documentation_action = QAction('О приложении', self)
         open_documentation_action.triggered.connect(
-            self.open_documentation
+            self.create_about_dialog
         )
         self.menu_settings.addAction(open_documentation_action)
     
@@ -201,6 +213,16 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             QtWidgets.QMessageBox.Ok
         )
 
+    def create_about_dialog(self):
+        QtWidgets.QMessageBox.information(
+            self, 
+            "О приложении", 
+            "Автор: Сергей Минаков\n\n" +
+            "GitHub: https://github.com/cergmin/AtAplication\n\n" +
+            "Версия: 0.24", 
+            QtWidgets.QMessageBox.Ok
+        )
+
     def create_settings_dialog(self):
         self.settings_dialog = AtSettingsDialog(self.sql, self)
         self.settings_dialog.show()
@@ -220,9 +242,6 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.main_edit_area.hide()
         self.main_area.show()
 
-        text_color = ('#fff' if self.theme == 'dark' else '#000')
-        subtext_color = ('#aaa' if self.theme == 'dark' else '#444')
-
         self.test_title.setText('')
         self.test_subtitle.setText('')
         self.test_verdict.setText('')
@@ -240,11 +259,57 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         self.draw_left_bar()
     
+    def open_project(self):
+        self.sub_tests_list.hide()
+        self.main_edit_area.hide()
+        self.main_area.show()
+
+        path = self.get_file_path(
+            title='Открыть проект',
+            types='Проекты AT (*.atp);;Все файлы (*)'
+        )
+
+        if path == '':
+            return
+
+        result = self.pc.load_project(path)
+
+        if result != '':
+            QtWidgets.QMessageBox.critical(
+                self, 
+                "Ошибка", 
+                str(result), 
+                QtWidgets.QMessageBox.Ok
+            )
+
+        self.draw_left_bar()
+    
+    def save_project(self):
+        path = self.get_file_path(
+            title='Открыть проект',
+            file_name='Проект.atp',
+            types='Проекты AT (*.atp);;Все файлы (*)',
+            dialog_type='save'
+        )
+
+        if path == '':
+            return
+
+        result = self.pc.save_project(path)
+
+        if result != '':
+            QtWidgets.QMessageBox.critical(
+                self, 
+                "Ошибка", 
+                str(result), 
+                QtWidgets.QMessageBox.Ok
+            )
+
     def draw_left_bar(self):
         self.draw_test_buttons(self.tests_list__widget, 
                                self.tests_list__layout,
                                self.sql.get_groups(),
-                               id_prefix='G', # G - group
+                               id_prefix='G',  # G - group
                                clear_layout=True,
                                on_click_function=self.select_group,
                                on_context_function=self.group_context_menu)
@@ -258,15 +323,15 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                                self.tests_list__layout,
                                self.sql.get_tests(),
                                clear_layout=False,
-                               id_prefix='T', # T - test
+                               id_prefix='T',  # T - test
                                on_click_function=self.select_test,
                                on_context_function=self.test_context_menu,
                                selected_test_id=self.selected_test_id)
         self.select_test(self.selected_test_id)
     
     def draw_test_buttons(self, widget, layout, tests, clear_layout=False,
-                          on_click_function=None, selected_test_id=-1, id_prefix='',
-                          on_context_function=None):
+                          on_click_function=None, selected_test_id=-1, 
+                          id_prefix='', on_context_function=None):
         # удаление всех кнопок из виджета, переданого как аргумент - widget
         if clear_layout:
             for btn in widget.findChildren(QtWidgets.QPushButton):
@@ -295,7 +360,9 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             self.test_buttons[str(id_prefix) + str(test['id'])] = test_btn
             
             if selected_test_id == test_id:
-                test_btn.setStyleSheet('border: 2px solid #bbb;border-radius: 5px;')
+                test_btn.setStyleSheet(
+                    'border: 2px solid #bbb;border-radius: 5px;'
+                )
     
     def select_test(self, test_id, remove_group_selection=True):
         if test_id == -1:
@@ -308,11 +375,15 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.test_console_result.show()
 
         if remove_group_selection and self.selected_group_id != -1:
-            self.test_buttons['G' + str(self.selected_group_id)].setStyleSheet('')
+            self.test_buttons[
+                'G' + str(self.selected_group_id)
+            ].setStyleSheet('')
             self.selected_group_id = -1
 
         if self.selected_test_id != -1:
-            self.test_buttons['T' + str(self.selected_test_id)].setStyleSheet('')
+            self.test_buttons[
+                'T' + str(self.selected_test_id)
+            ].setStyleSheet('')
 
         self.test_buttons['T' + str(test_id)].setStyleSheet(
             'border: 2px solid #bbb;border-radius: 5px;'
@@ -345,34 +416,39 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         self.test_title.setText(test_info['title'])
         self.test_subtitle.setText(test_info['subtitle'])
-        self.test_verdict.setText('''<p>
+        self.test_verdict.setText(
+            '''<p>
             <span style="color:''' + subtext_color + ''';">Вердикт: </span>
             <span style="font-family:'Consolas';
-                        font-weight:600;
-                        color: #fff;
-                        background-color:''' + verdict_info[1] + ''';">''' + 
+                         font-weight:600;
+                         color: #fff;
+                         background-color:''' + verdict_info[1] + ''';">''' + 
             verdict_info[0] + '''</span></p>''')
-        self.test_checker.setText('''<p>
+        self.test_checker.setText(
+            '''<p>
             <span style="color:''' + subtext_color + '''">Чекер: </span>
             <span style="font-family:'Consolas';
-                        font-weight:600; 
-                        color:''' + text_color + '''">''' + 
+                         font-weight:600; 
+                         color:''' + text_color + '''">''' + 
             checker_info['name'] + '''</span></p>''')
-        self.test_checker_arg_1.setText('''<p>
+        self.test_checker_arg_1.setText(
+            '''<p>
             <span style="color:''' + subtext_color + '''">''' + 
             checker_info['arg_1_title'] + ''': </span>
             <span style="font-family:'Consolas';
-                        font-weight:600; 
-                        color:''' + text_color + '''">''' + 
+                         font-weight:600; 
+                         color:''' + text_color + '''">''' + 
             checker_info['arg_1_subtitle'] + '''</span></p>''')
-        self.test_checker_arg_2.setText('''<p>
+        self.test_checker_arg_2.setText(
+            '''<p>
             <span style="color:''' + subtext_color + '''">''' + 
             checker_info['arg_2_title'] + ''': </span>
             <span style="font-family:'Consolas';
-                        font-weight:600; 
-                        color:''' + text_color + '''">''' + 
+                         font-weight:600; 
+                         color:''' + text_color + '''">''' + 
             checker_info['arg_2_subtitle'] + '''</span></p>''')
-        self.test_file_path.setText('''<p>
+        self.test_file_path.setText(
+            '''<p>
             <span style="color:''' + subtext_color + '''">Файл: </span>
             <span style="font-family:'Consolas';
                          font-weight:600;
@@ -397,9 +473,11 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.draw_test_buttons(self.sub_test_list__widget, 
                                self.sub_test_list__layout,
                                self.sql.get_subtests(group_id),
-                               id_prefix='T', # T - test
+                               id_prefix='T',  # T - test
                                clear_layout=True,
-                               on_click_function=lambda x: self.select_test(x, False),
+                               on_click_function=lambda x: self.select_test(
+                                   x, False
+                                ),
                                on_context_function=self.test_context_menu)
         
         self.select_test(sql.get_subtests(group_id)[0]['id'])
@@ -422,7 +500,9 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
         self.edit_checker_arg_2.setPlainText(str(test_info['checker_arg_2']))
         self.edit_file_path.setText(str(test_info['path']))
 
-        current_checker_combo_item = self.sql.get_checker(self.selected_test_id)
+        current_checker_combo_item = self.sql.get_checker(
+            self.selected_test_id
+        )
         self.edit_checker_combo.clear()
         for i, item in enumerate(self.sql.get_checkers()):
             self.edit_checker_combo.addItem(item['name'], userData=item['id'])
@@ -475,13 +555,14 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
             subtext_color = ('#aaa' if self.theme == 'dark' else '#444')
 
             verdict_info = get_verdict_info[verdict]
-            self.test_verdict.setText('''<p>
+            self.test_verdict.setText(
+                '''<p>
                 <span style="color:''' + subtext_color + '''">Вердикт: </span>
                 <span style="font-family:'Consolas';
-                            font-weight:600; 
-                            color: #fff;
-                            background-color:''' + verdict_info[1] + ''';">''' + 
-                verdict_info[0] + '''</span></p>''')
+                             font-weight:600; 
+                             color: #fff;
+                             background-color:''' + verdict_info[1] + 
+                ''';">''' + verdict_info[0] + '''</span></p>''')
             
             self.test_console_result.setPlainText(console_output)
         
@@ -504,15 +585,20 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
                 self.sql.get_group(group_id)['verdict']
             )
 
-    def open_documentation(self):
-        print('Открыть документацию!')
-
 if __name__ == '__main__':
     sql = SQLController('at.sqlite3')
     tc = TestConroller(sql)
     pc = ProjectController(sql)
     
     app = QApplication(sys.argv)
+
+    app_icon = QtGui.QIcon()
+    app_icon.addFile('images/icon@x32.png', QtCore.QSize(32, 32))
+    app_icon.addFile('images/icon@x64.png', QtCore.QSize(64, 64))
+    app_icon.addFile('images/icon@x256.png', QtCore.QSize(256, 256))
+    app_icon.addFile('images/icon@x512.png', QtCore.QSize(512, 512))
+    app.setWindowIcon(app_icon)
+
     ex = AtMainWindow(sql, tc, pc)
     ex.show()
     sys.exit(app.exec_())
