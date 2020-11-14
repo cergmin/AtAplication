@@ -253,7 +253,6 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         self.run_the_test_btn.hide()
         self.edit_test_btn.hide()
-        self.pushButton.hide()
         self.test_console_title.hide()
         self.test_console_result.hide()
 
@@ -370,7 +369,6 @@ class AtMainWindow(QMainWindow, Ui_MainWindow):
 
         self.run_the_test_btn.show()
         self.edit_test_btn.show()
-        self.pushButton.show()
         self.test_console_title.show()
         self.test_console_result.show()
 

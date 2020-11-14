@@ -191,16 +191,11 @@ class TestConroller:
 
 
 class SQLController:
-    # Если файла не существует и init_db = True, 
-    # то он будет создан, а база данных инициализирована
-    def __init__(self, file, init_db=False):
+    def __init__(self, file):
         file = str(file)
 
         if not exists(file):
-            if init_db:
-                pass
-            else:
-                raise FileExistsError('File \'' + file + '\' does not exist')
+            raise FileExistsError('File \'' + file + '\' does not exist')
         elif not isfile(file):
             raise TypeError('File expected, but folder were given')
 
